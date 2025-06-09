@@ -1,5 +1,5 @@
 from app.handlers import router
-from aiogram import  F, types
+from aiogram import F, types
 from aiogram.filters import Command
 from aiogram.types import Message
 import requests
@@ -36,14 +36,13 @@ async def get_payments_list(message: Message):
 
         # Build a table-like message
         text = f"📋 <b>{telegram_user.first_name}, so'nggi to'lovlar ro'yxati:</b>\n\n"
-        text += "{:<15} {:<12} {:<10} {:<10}\n".format("Sana", "Miqdor", "Holat", "Turi")
+        text += "{:<15} {:<12} {:<10} {:<10}\n".format("Sana", "Miqdor", "Turi")
         text += "-" * 40 + "\n"
 
         for pay in payments[:10]:  # show only first 10 payments for brevity
-            text += "{:<5} {:<12} {:<10} {:<10}\n".format(
+            text += "{:<5} {:<12} {:<10}\n".format(
                 pay['date'],
                 pay['amount'],
-                "✅" if pay['payment'] else "❌",
                 pay['payment_type']
             )
 
@@ -57,7 +56,6 @@ async def handle_test_results(message: Message):
     from run import api
     telegram_user = message.from_user
     telegram_id = message.from_user.id
-    print("Handler called once!")  # Add this line
 
     with SessionLocal() as session:
         get_user = session.query(User).filter(User.telegram_id == telegram_id).first()
@@ -72,7 +70,6 @@ async def handle_test_results(message: Message):
             return
 
         text = f"📚 <b>{telegram_user.first_name},  test natijalari:</b>\n\n"
-        pprint.pprint(test_results)
         for group in test_results:
             group_name = group['name']
             subject_name = group['subject']

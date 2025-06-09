@@ -31,9 +31,17 @@ class LoginStates(StatesGroup):
 async def cmd_start(message: Message):
     await message.reply(
         "👋 Assalomu alaykum!\n\n"
-        "🤖 <b>Gennis botiga xush kelibsiz!</b>\n"
-        "🔐 Botdan foydalanish uchun tizimga kirishingiz kerak.\n\n"
-        "👇 Davom etish uchun quyidagi tugmani bosing!",
+        "🤖 <b>Gennis botiga xush kelibsiz!</b>\n\n"
+        "Ushbu bot orqali siz quyidagi imkoniyatlardan foydalanishingiz mumkin:\n\n"
+        "👨‍🏫 <b>O‘qituvchilar uchun:</b>\n"
+        "   • 💳 Oylik ma'lumotlarini ko‘rish\n"
+        "   • 📄 Har bir oy bo‘yicha tafsilotlarni olish\n\n"
+        "👨‍🎓 <b>O‘quvchilar uchun:</b>\n"
+        "   • 💳 To‘lovlar ro‘yxatini kuzatish\n"
+        "   • 🎯 Test natijalari va\n"
+        "   • 📝 Davomat statistikasini ko‘rish\n\n"
+        "🔐 Botdan foydalanish uchun tizimga kiring.\n"
+        "👇 Davom etish uchun quyidagi tugmani bosing:",
         parse_mode="HTML",
         reply_markup=kb.login_keyboard
     )

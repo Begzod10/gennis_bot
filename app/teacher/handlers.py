@@ -1,13 +1,13 @@
-from app.handlers import router
-from aiogram import Router, F, types
-from aiogram.filters import Command
-from aiogram.types import Message
-import requests
-from app.models import User, Teacher
-from app.db import SessionLocal
+from aiogram import F
 import pprint
-from .keyboards import teacher_basic_reply_keyboard, teacher_years_keyboard
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
+import requests
+from aiogram import F
 from aiogram import Router
+
+from app.db import SessionLocal
+from app.models import User, Teacher
+from .keyboards import teacher_years_keyboard
 
 teacher_router = Router()
 teacher_years_data = {}
@@ -26,17 +26,16 @@ async def get_oyliklar_royxati(message: Message):
 
         response = requests.get(f'{api}/api/bot_teacher_salary_years/{teacher.platform_id}')
         data = response.json()
-        pprint.pprint(data)
+
         years = data.get('years', [])
         teacher_years_data[telegram_id] = years
-        print("Stored years for user:", teacher_years_data.get(message.from_user.id, []))
 
     await message.answer("✅ Yilni tanlang:", reply_markup=await teacher_years_keyboard(years))
 
 
 @teacher_router.message(lambda message: message.text.strip() in teacher_years_data.get(message.from_user.id, []))
 async def handle_dynamic_year_selection(message: Message):
-    from run import api  # Use separate config to avoid circular imports
+    from run import api
     telegram_id = message.from_user.id
     year = message.text.strip()
     await message.answer(f"✅ Siz {year} yilni tanladingiz!")
@@ -66,16 +65,100 @@ async def handle_dynamic_year_selection(message: Message):
             f"📅 <b>Yil:</b> {year}\n\n"
             f"<b>🧾 Oylik ma'lumotlari:</b>\n\n"
         )
-
+        await message.answer(text, parse_mode="HTML")
         for item in salary_list:
             debt = item['debt'] if item['debt'] is not None else 0
-            text += (
-                f"🗓 <b>{item['month']}</b>\n"
+            month = item['month']
+
+            # Build message text
+            text = (
+                f"🗓 <b>{month}</b>\n"
                 f"💰 Umumiy oylik: <b>{item['total_salary']:,} so'm</b>\n"
                 f"✅ Olingan: <b>{item['taken_money']:,} so'm</b>\n"
                 f"❗ Qolgan: <b>{item['remaining_salary']:,} so'm</b>\n"
                 f"💳 Qarz: <b>{debt:,} so'm</b>\n"
-                f"{'━' * 25}\n"
             )
 
-        await message.answer(text, parse_mode="HTML")
+            # Create inline keyboard with callback data
+
+            keyboard = InlineKeyboardMarkup(
+                inline_keyboard=[
+                    [
+                        InlineKeyboardButton(
+                            text="📄 Batafsil ko‘rish",
+                            callback_data=f"detail:{teacher.platform_id}:{item['id']}:{month}"
+                        )
+                    ]
+                ]
+            )
+
+            await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+
+
+@teacher_router.callback_query(lambda c: c.data.startswith("detail:"))
+async def handle_click(callback_query: CallbackQuery):
+    from run import api
+    _, teacher_id, salary_id, month = callback_query.data.split(":")
+    await callback_query.answer()
+
+    response = requests.get(f'{api}/api/bot_teacher_salary_details/{teacher_id}/{salary_id}')
+    data = response.json()
+
+    if not data or not isinstance(data, dict):
+        await callback_query.message.answer("⚠️ Avans ma'lumotlari topilmadi.")
+        return
+
+    # Summary fields
+    name = data.get("name", "Noma'lum")
+    surname = data.get("surname", "")
+    location = data.get("location", "❓")
+    month = data.get("month", "❓")
+    total_salary = data.get("total_salary", 0)
+    taken_money = data.get("taken_money", 0)
+    remaining_salary = data.get("remaining_salary", 0)
+    debt = data.get("debt") if data.get("debt") is not None else 0
+
+    salary_list = data.get("salary_list", [])
+
+    # Header summary
+    summary_text = (
+        f"👨‍🏫 <b>O'qituvchi:</b> {name} {surname}\n"
+        f"📍 <b>Filial:</b> {location}\n"
+        f"📅 <b>Oy:</b> {month}\n\n"
+        f"💰 <b>Umumiy oylik:</b> {total_salary:,} so'm\n"
+        f"✅ <b>Olingan:</b> {taken_money:,} so'm\n"
+        f"❗ <b>Qolgan:</b> {remaining_salary:,} so'm\n"
+        f"💳 <b>Qarz:</b> {debt:,} so'm\n"
+        f"{'━' * 25}\n"
+        f"🧾 <b>Avanslar tafsiloti:</b>\n\n"
+    )
+
+    await callback_query.message.answer(summary_text, parse_mode="HTML")
+
+    # Combine all payment details
+    payment_text = ""
+    for i, item in enumerate(salary_list, start=1):
+        amount = item.get('amount', 0)
+        date = item.get('date', '❓')
+        payment_type = item.get('payment_type', '❓')
+        reason = item.get('reason', '❓')
+        type_name = item.get('type_name', '❓')
+
+        emoji = "💳" if payment_type == "cash" else "🖱"
+
+        payment_text += (
+            f"🧾 <b>#{i}</b>\n"
+            f"📅 <b>Sana:</b> {date}\n"
+            f"💰 <b>Miqdor:</b> {amount:,} so'm\n"
+            f"{emoji} <b>To'lov turi:</b> {payment_type}\n"
+            f"📌 <b>Sabab:</b> {reason}\n"
+            f"{'━' * 25}\n"
+        )
+
+    # Telegram max length = 4096 characters
+    if len(payment_text) > 4000:
+        # Send in chunks if too long
+        for i in range(0, len(payment_text), 4000):
+            await callback_query.message.answer(payment_text[i:i + 4000], parse_mode="HTML")
+    else:
+        await callback_query.message.answer(payment_text, parse_mode="HTML")
