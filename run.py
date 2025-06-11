@@ -1,7 +1,6 @@
 import asyncio
 import logging
 from aiogram import Bot, Dispatcher, types, F
-from config import TOKEN
 from app.handlers import router
 from app.student.handlers import student_router
 from app.teacher.handlers import teacher_router
@@ -12,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-bot = Bot(token=TOKEN)
+bot = Bot(token=os.getenv('TOKEN'))
 dp = Dispatcher()
 api = os.getenv('API')
 
