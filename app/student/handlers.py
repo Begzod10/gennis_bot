@@ -36,7 +36,7 @@ async def get_payments_list(message: Message):
 
         # Build a table-like message
         text = f"📋 <b>{telegram_user.first_name}, so'nggi to'lovlar ro'yxati:</b>\n\n"
-        text += "{:<15} {:<12} {:<10} {:<10}\n".format("Sana", "Miqdor", "Turi")
+        text += "{:<15} {:<12} {:<10}\n".format("Sana", "Miqdor", "Turi")
         text += "-" * 40 + "\n"
 
         for pay in payments[:10]:  # show only first 10 payments for brevity

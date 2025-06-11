@@ -66,17 +66,21 @@ async def handle_dynamic_year_selection(message: Message):
             f"<b>🧾 Oylik ma'lumotlari:</b>\n\n"
         )
         await message.answer(text, parse_mode="HTML")
+        pprint.pprint(salary_list)
+        pprint.pprint(salary_list)
         for item in salary_list:
             debt = item['debt'] if item['debt'] is not None else 0
             month = item['month']
-
+            taken_money = item['taken_money'] if item['taken_money'] is not None else 0
+            print(month)
             # Build message text
             text = (
                 f"🗓 <b>{month}</b>\n"
                 f"💰 Umumiy oylik: <b>{item['total_salary']:,} so'm</b>\n"
-                f"✅ Olingan: <b>{item['taken_money']:,} so'm</b>\n"
+                f"✅ Olingan: <b>{taken_money:,} so'm</b>\n"
                 f"❗ Qolgan: <b>{item['remaining_salary']:,} so'm</b>\n"
                 f"💳 Qarz: <b>{debt:,} so'm</b>\n"
+                f"🖤 Black Salary: <b>{item['black_salary']:,} so'm</b>\n"
             )
 
             # Create inline keyboard with callback data
@@ -104,7 +108,7 @@ async def handle_click(callback_query: CallbackQuery):
     response = requests.get(f'{api}/api/bot_teacher_salary_details/{teacher_id}/{salary_id}')
     data = response.json()
 
-    if not data or not isinstance(data, dict):
+    if not data or not isinstance(data, dict) or 'salary_list' not in data:
         await callback_query.message.answer("⚠️ Avans ma'lumotlari topilmadi.")
         return
 
@@ -116,10 +120,14 @@ async def handle_click(callback_query: CallbackQuery):
     total_salary = data.get("total_salary", 0)
     taken_money = data.get("taken_money", 0)
     remaining_salary = data.get("remaining_salary", 0)
+    black_salary = data.get("black_salary", 0)
     debt = data.get("debt") if data.get("debt") is not None else 0
 
     salary_list = data.get("salary_list", [])
-
+    print(salary_list)
+    if not salary_list:
+        await callback_query.message.answer("⚠️ Avans ma'lumotlari topilmadi.")
+        return
     # Header summary
     summary_text = (
         f"👨‍🏫 <b>O'qituvchi:</b> {name} {surname}\n"
@@ -129,6 +137,7 @@ async def handle_click(callback_query: CallbackQuery):
         f"✅ <b>Olingan:</b> {taken_money:,} so'm\n"
         f"❗ <b>Qolgan:</b> {remaining_salary:,} so'm\n"
         f"💳 <b>Qarz:</b> {debt:,} so'm\n"
+        f"🖤 Black Salary: <b>{black_salary:,} so'm</b>\n"
         f"{'━' * 25}\n"
         f"🧾 <b>Avanslar tafsiloti:</b>\n\n"
     )
