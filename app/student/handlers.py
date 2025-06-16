@@ -59,7 +59,7 @@ async def handle_test_results(message: Message):
 
 
 
-    # test results 222
+    # test results 222 333
     with SessionLocal() as session:
         get_user = session.query(User).filter(User.telegram_id == telegram_id).first()
         student = session.query(Student).filter(Student.user_id == get_user.id).first()
