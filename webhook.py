@@ -9,7 +9,7 @@ app = Flask(__name__)
 GITHUB_SECRET = b''  # optional
 
 
-@app.route("/payload", methods=["POST"])
+@app.route("/api/payload", methods=["POST"])
 def payload():
     # (Optional) verify signature
     if GITHUB_SECRET:
