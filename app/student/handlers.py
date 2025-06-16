@@ -57,9 +57,6 @@ async def handle_test_results(message: Message):
     telegram_user = message.from_user
     telegram_id = message.from_user.id
 
-
-
-    # test results 222 333 444 555
     with SessionLocal() as session:
         get_user = session.query(User).filter(User.telegram_id == telegram_id).first()
         student = session.query(Student).filter(Student.user_id == get_user.id).first()
