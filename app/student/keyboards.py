@@ -69,7 +69,7 @@ def create_years_reply_keyboard(data):
             row = []
     if row:  # Add any remaining year (odd number of years)
         keyboard.append(row)
-    row.append(KeyboardButton(text="⬅️ Ortga qaytish"))
+    keyboard.append(KeyboardButton(text="⬅️ Ortga qaytish"))
     return ReplyKeyboardMarkup(
         keyboard=keyboard,
         resize_keyboard=True,
