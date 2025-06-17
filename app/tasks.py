@@ -8,9 +8,17 @@ from dotenv import load_dotenv
 from .student.keyboards import student_basic_reply_keyboard
 from .teacher.keyboards import teacher_basic_reply_keyboard
 import app.keyboards as kb
+from celery.schedules import crontab
 
 load_dotenv()
 celery = Celery('my_tasks', broker=os.getenv('CELERY_BROKER_URL'), backend=os.getenv('CELERY_RESULT_BACKEND'))
+
+celery.conf.beat_schedule = {
+    'send-balance-every-12-hours': {
+        'task': 'app.tasks.send_balance_to_users',
+        'schedule': crontab(minute=0, hour='0,12'),  # 00:00 and 12:00 every day
+    },
+}
 
 
 @celery.task(name='app.tasks.process_login_task')
@@ -81,3 +89,44 @@ def process_login_task(telegram_id, username, password):
             session.commit()
 
     return result
+
+
+@celery.task(name='app.tasks.send_balance_to_users')
+def send_balance_to_users():
+    import os
+    import requests
+    import asyncio
+    from aiogram import Bot
+    from app.models import User, Student, Teacher
+    from app.db import SessionLocal
+
+    api = os.getenv('API')
+    bot = Bot(token=os.getenv('TOKEN'))
+
+    async def _send_all():
+        async with bot.session:
+            with SessionLocal() as session:
+                users = session.query(User).all()
+                for user in users:
+                    if user.user_type == 'student':
+                        student = session.query(Student).filter(Student.user_id == user.id).first()
+                        platform_id = student.platform_id
+                    elif user.user_type == 'teacher':
+                        teacher = session.query(Teacher).filter(Teacher.user_id == user.id).first()
+                        platform_id = teacher.platform_id
+                    else:
+                        continue
+
+                    try:
+                        response = requests.get(f'{api}/api/bot_student_balance/{platform_id}/{user.user_type}')
+                        balance = response.json().get('balance')
+                        text = f"📢 Sizning hisobingiz: {balance} so'm"
+                        await bot.send_message(chat_id=user.telegram_id, text=text)
+                    except Exception as e:
+                        print(f"❌ Failed to send to {user.telegram_id}: {e}")
+
+    # Run inside a new loop properly
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    loop.run_until_complete(_send_all())
+    loop.close()
