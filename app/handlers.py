@@ -12,6 +12,7 @@ from .student.keyboards import student_basic_reply_keyboard
 from .teacher.keyboards import teacher_basic_reply_keyboard
 from .models import User, Student, Teacher
 from app.db import SessionLocal
+from app.tasks import process_login_task
 
 router = Router()
 router.message.outer_middleware(TestMiddleware())
@@ -69,87 +70,35 @@ async def get_username(message: Message, state: FSMContext):
 
 @router.message(LoginStates.waiting_for_password)
 async def get_password(message: Message, state: FSMContext):
-    from run import api
-    telegram_user = message.from_user
-    telegram_id = telegram_user.id
-
+    telegram_id = message.from_user.id
     user_data = await state.get_data()
     username = user_data['username']
     password = message.text
 
-    response = requests.post(f'{api}/api/login2', json={
-        'username': username,
-        'password': password
-    })
-    if 'user' not in response.json():
-        await message.answer("🚫 Foydalanuvchi nomi yoki parol xato!")
-        return
+    # Start the Celery task
+    task = process_login_task.delay(telegram_id, username, password)
 
-    with SessionLocal() as session:
-        platform_id = response.json()['user']['id']
+    await message.answer("⏳ Tizimga kirish so‘rovi yuborildi...")
 
-        user = session.query(User).filter(
-            User.telegram_id == telegram_id,
-        ).first()
+    # Wait up to 5 seconds for result (for demo purposes only)
+    # try:
+    result = task.get(timeout=5)  # ⚠️ avoid in production unless background
+    if result['success']:
+        reply_keyboard = student_basic_reply_keyboard if result[
+                                                             'user_type'] == 'student' else teacher_basic_reply_keyboard
+        emoji = {
+            "student": "👨‍🎓",
+            "teacher": "🧑‍🏫"
+        }.get(result["user_type"], "👨‍💼")
+        await message.answer(
+            f"✅ {emoji} {result['name']} {result['surname']} ({result['user_type']})\n"
+            f"Tizimga kirish muvaffaqiyatli amalga oshirildi", reply_markup=reply_keyboard
+        )
 
-        if not user:
-            user = User(telegram_id=telegram_id, platform_id=platform_id, name=response.json()['user']['name'],
-                        surname=response.json()['user']['surname'], )
-            session.add(user)
-            session.commit()
-        else:
-            user.name = response.json()['user']['name']
-            user.surname = response.json()['user']['surname']
-            session.commit()
-        if response.json()['type_user'] == 'student':
-            student_data = response.json()['user']['student']
-
-            user.user_type = 'student'
-            session.commit()
-            student = session.query(Student).filter(
-                Student.user_id == user.id,
-            ).first()
-
-            if not student:
-                student = Student(
-                    platform_id=student_data['id'],
-                    user_id=user.id
-                )
-                session.add(student)
-                session.commit()
-            student.platform_id = student_data['id']
-            session.commit()
-            reply_keyboard = student_basic_reply_keyboard
-            emoji = "👨‍🎓"
-        elif response.json()['type_user'] == 'teacher':
-            user.user_type = 'teacher'
-            session.commit()
-            teacher_data = response.json()['user']['teacher']
-            teacher = session.query(Teacher).filter(
-                Teacher.user_id == user.id,
-            ).first()
-
-            if not teacher:
-                teacher = Teacher(
-                    platform_id=teacher_data['id'],
-                    user_id=user.id
-                )
-                session.add(teacher)
-                session.commit()
-            teacher.platform_id = teacher_data['id']
-            session.commit()
-            reply_keyboard = teacher_basic_reply_keyboard
-            emoji = "🧑‍🏫"
-        else:
-            reply_keyboard = None
-            emoji = "👨‍💼"
-
-        if response.json()['success']:
-            await message.answer(
-                f"{emoji} {response.json()['data']['name']} {response.json()['data']['surname']} ({response.json()['type_user']})"
-                f"\nTizimga kirish muvaffaqiyatli amalga oshirildi", reply_markup=reply_keyboard)
-        else:
-            await message.reply("❌ Incorrect username or password.", reply_markup=kb.login_keyboard)
+    else:
+        await message.answer("❌ Foydalanuvchi nomi yoki parol xato!", reply_markup=kb.login_keyboard)
+    # except Exception:
+    #     await message.answer("⚠️ So‘rov ishlovida xatolik yuz berdi. Keyinroq urinib ko‘ring.")
 
     await state.clear()
 

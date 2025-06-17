@@ -7,7 +7,8 @@ from app.models import User, Student, Teacher
 from app.db import SessionLocal
 import pprint
 from .keyboards import create_years_reply_keyboard, create_months_inline_keyboard, student_basic_reply_keyboard
-
+import os
+from dotenv import load_dotenv
 from app.keyboards import login_keyboard
 from aiogram import Router
 
@@ -17,11 +18,12 @@ user_months_data = {}
 datas = {}
 selected_year = {}
 selected_month = {}
+load_dotenv()
 
 
 @student_router.message(F.text == "💳 To'lovlar ro‘yhati")
 async def get_payments_list(message: Message):
-    from run import api
+    api = os.getenv('API')
     telegram_user = message.from_user
     telegram_id = telegram_user.id
     with SessionLocal() as session:
@@ -53,7 +55,7 @@ async def get_payments_list(message: Message):
 
 @student_router.message(F.text.startswith("🎯 Test natijalari"))
 async def handle_test_results(message: Message):
-    from run import api
+    api = os.getenv('API')
     telegram_user = message.from_user
     telegram_id = message.from_user.id
 
@@ -102,7 +104,7 @@ async def handle_test_results(message: Message):
 
 @student_router.message(F.text == "📝 Davomatlar ro‘yhati")
 async def get_davomatlar_royxati(message: Message):
-    from run import api
+    api = os.getenv('API')
     telegram_user = message.from_user
     telegram_id = telegram_user.id
 
@@ -132,7 +134,7 @@ async def handle_dynamic_year_selection(message: Message):
 
 @student_router.callback_query(lambda c: c.data.startswith("month_"))
 async def handle_month_selection(callback: types.CallbackQuery):
-    from run import api
+    api = os.getenv('API')
     telegram_user = callback.message.from_user
     telegram_id = callback.from_user.id
     month = callback.data.split("_")[1]

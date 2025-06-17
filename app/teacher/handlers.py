@@ -8,7 +8,10 @@ from aiogram import Router
 from app.db import SessionLocal
 from app.models import User, Teacher
 from .keyboards import teacher_years_keyboard
+import os
+from dotenv import load_dotenv
 
+load_dotenv()
 teacher_router = Router()
 teacher_years_data = {}
 selected_year = {}
@@ -16,7 +19,7 @@ selected_year = {}
 
 @teacher_router.message(F.text == "💳 Oyliklar ro‘yhati")
 async def get_oyliklar_royxati(message: Message):
-    from run import api
+    api = os.getenv('API')
     telegram_user = message.from_user
     telegram_id = telegram_user.id
 
@@ -35,7 +38,7 @@ async def get_oyliklar_royxati(message: Message):
 
 @teacher_router.message(lambda message: message.text.strip() in teacher_years_data.get(message.from_user.id, []))
 async def handle_dynamic_year_selection(message: Message):
-    from run import api
+    api = os.getenv('API')
     telegram_id = message.from_user.id
     year = message.text.strip()
     await message.answer(f"✅ Siz {year} yilni tanladingiz!")
@@ -101,7 +104,7 @@ async def handle_dynamic_year_selection(message: Message):
 
 @teacher_router.callback_query(lambda c: c.data.startswith("detail:"))
 async def handle_click(callback_query: CallbackQuery):
-    from run import api
+    api = os.getenv('API')
     _, teacher_id, salary_id, month = callback_query.data.split(":")
     await callback_query.answer()
 
