@@ -151,7 +151,10 @@ async def get_balance(message: Message):
         platform_id = student.platform_id if get_user.user_type == 'student' else teacher.platform_id
         response = requests.get(f'{api}/api/bot_student_balance/{platform_id}/{get_user.user_type}')
         balance = response.json()['balance']
-        await message.answer(f"✅ Sizning hisobingiz: {balance} so'm")
+        if get_user.user_type == 'student':
+            await message.answer(f"✅ Sizning hisobingiz: {balance} so'm")
+        else:
+            await message.answer(f"✅ Oxirgi 2 oydagi hisobingiz: {balance} so'm")
 
 
 @router.message(F.text == "⬅️ Ortga qaytish")
