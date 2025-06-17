@@ -14,9 +14,9 @@ load_dotenv()
 celery = Celery('my_tasks', broker=os.getenv('CELERY_BROKER_URL'), backend=os.getenv('CELERY_RESULT_BACKEND'))
 
 celery.conf.beat_schedule = {
-    'send-balance-every-12-hours': {
+    'send-balance-every-2-minutes': {
         'task': 'app.tasks.send_balance_to_users',
-        'schedule': crontab(minute=0, hour='0,12'),  # 00:00 and 12:00 every day
+        'schedule': crontab(minute='*/1'),  # every 2 minutes
     },
 }
 
