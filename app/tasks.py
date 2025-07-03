@@ -1,48 +1,35 @@
-# tasks.py
-from celery import Celery
-import requests
+import pprint
+
 from app.db import SessionLocal
-from app.models import User, Student, Teacher
+from app.models import User, Student, Teacher, Parent
 import os
-from dotenv import load_dotenv
-from .student.keyboards import student_basic_reply_keyboard
-from .teacher.keyboards import teacher_basic_reply_keyboard
-import app.keyboards as kb
-from celery.schedules import crontab
-
-load_dotenv()
-celery = Celery('my_tasks', broker=os.getenv('CELERY_BROKER_URL'), backend=os.getenv('CELERY_RESULT_BACKEND'))
-
-celery.conf.beat_schedule = {
-    'send-balance-every-12-hours': {
-        'task': 'app.tasks.send_balance_to_users',
-        'schedule': crontab(minute=0, hour='0,12'),  # 00:00 and 12:00 every day
-    },
-}
+from app.celery_app import celery
 
 
 @celery.task(name='app.tasks.process_login_task')
 def process_login_task(telegram_id, username, password):
     import requests
     api = os.getenv('API')
+
     response = requests.post(f"{api}/api/login2", json={
         "username": username,
         "password": password
     })
-
+    parent = response.json().get('parent') if 'parent' in response.json() else None
     result = {
         "success": False,
         "user_type": None,
         "name": None,
         "surname": None,
         "error": "Login failed",
+        "parent": None
     }
-
     if 'user' not in response.json():
         return result
 
     with SessionLocal() as session:
         user_data = response.json()['user']
+
         user = session.query(User).filter(User.telegram_id == telegram_id).first()
 
         if not user:
@@ -68,13 +55,18 @@ def process_login_task(telegram_id, username, password):
             session.commit()
 
         if result["user_type"] == "student":
+            other_students = session.query(Student).filter(Student.user_id == user.id).all()
+            for student in other_students:
+                student.user_id = None
+                session.commit()
             student_data = user_data["student"]
-            student = session.query(Student).filter(Student.user_id == user.id).first()
+            student = session.query(Student).filter(Student.platform_id == student_data['id']).first()
             if not student:
-                student = Student(platform_id=student_data['id'], user_id=user.id)
+                student = Student(platform_id=student_data['id'], user_id=user.id, name=user.name, surname=user.surname)
                 session.add(student)
             else:
                 student.platform_id = student_data['id']
+                student.user_id = user.id
             session.commit()
 
         elif result["user_type"] == "teacher":
@@ -87,6 +79,33 @@ def process_login_task(telegram_id, username, password):
             else:
                 teacher.platform_id = teacher_data['id']
             session.commit()
+        elif result["user_type"] == "parent":
+
+            parent_get = session.query(Parent).filter(Parent.user_id == user.id).first()
+            if not parent_get:
+                parent_get = Parent(platform_id=parent['parent_id'], user_id=user.id)
+                session.add(parent_get)
+            else:
+                parent_get.platform_id = parent['parent_id']
+
+            result["parent"] = parent_get.id
+            session.commit()
+
+            if parent['children']:
+                for child in parent['children']:
+                    student = session.query(Student).filter(Student.platform_id == child['id']).first()
+                    if not student:
+                        student = Student(platform_id=child['id'], name=child['name'],
+                                          surname=child['surname'])
+                        session.add(student)
+                    else:
+                        student.platform_id = child['id']
+                        student.user_id = None
+                        student.name = child['name']
+                        student.surname = child['surname']
+                    if student not in parent_get.students:
+                        parent_get.students.append(student)
+                    session.commit()
 
     return result
 

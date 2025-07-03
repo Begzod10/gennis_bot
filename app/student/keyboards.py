@@ -23,6 +23,24 @@ student_basic_reply_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True,
     input_field_placeholder="👆 Birini tanlang!"
 )
+student_basic_reply_keyboard_for_parent = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="👤 Mening hisobim"),
+            KeyboardButton(text="🎯 Test natijalari"),
+        ],
+        [
+            KeyboardButton(text="💳 To'lovlar ro‘yhati"),
+            KeyboardButton(text="📚 Darslar ro‘yhati"),
+        ],
+        [
+            KeyboardButton(text="📝 Davomatlar ro‘yhati"),
+            KeyboardButton(text="⬅️ Ortga qaytish"),
+        ],
+    ],
+    resize_keyboard=True,
+    input_field_placeholder="👆 Birini tanlang!"
+)
 
 
 def create_months_inline_keyboard(data, selected_year=None):
@@ -67,10 +85,10 @@ def create_years_reply_keyboard(data):
         if (i + 1) % 2 == 0:
             keyboard.append(row)
             row = []
+
+    row.append(KeyboardButton(text="⬅️ Ortga qaytish"))
     if row:  # Add any remaining year (odd number of years)
         keyboard.append(row)
-    row.append(KeyboardButton(text="⬅️ Ortga qaytish"))
-    keyboard.append(row)
     return ReplyKeyboardMarkup(
         keyboard=keyboard,
         resize_keyboard=True,

@@ -96,9 +96,9 @@ async def handle_test_results(message: Message):
 
 
 @student_router.message(F.text == "📝 Davomatlar ro‘yhati")
-async def get_davomatlar_royxati(message: Message, state: FSMContext):
+async def get_davomatlar_royxati(message: Message):
     api = os.getenv('API')
-    await state.set_state(MenuStates.attendances)
+    await state.set_state(MenuStates.menu)
     telegram_user = message.from_user
     telegram_id = telegram_user.id
     student = get_student(telegram_id)

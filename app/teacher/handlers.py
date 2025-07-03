@@ -4,12 +4,13 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, C
 import requests
 from aiogram import F
 from aiogram import Router
-
+from aiogram.fsm.context import FSMContext
 from app.db import SessionLocal
 from app.models import User, Teacher
 from .keyboards import teacher_years_keyboard
 import os
 from dotenv import load_dotenv
+from app.states import MenuStates
 
 load_dotenv()
 teacher_router = Router()
@@ -18,11 +19,11 @@ selected_year = {}
 
 
 @teacher_router.message(F.text == "💳 Oyliklar ro‘yhati")
-async def get_oyliklar_royxati(message: Message):
+async def get_oyliklar_royxati(message: Message, state: FSMContext):
     api = os.getenv('API')
     telegram_user = message.from_user
     telegram_id = telegram_user.id
-
+    await state.set_state(MenuStates.salary)
     with SessionLocal() as session:
         get_user = session.query(User).filter(User.telegram_id == telegram_id).first()
         teacher = session.query(Teacher).filter(Teacher.user_id == get_user.id).first()
@@ -69,13 +70,10 @@ async def handle_dynamic_year_selection(message: Message):
             f"<b>🧾 Oylik ma'lumotlari:</b>\n\n"
         )
         await message.answer(text, parse_mode="HTML")
-        pprint.pprint(salary_list)
-        pprint.pprint(salary_list)
         for item in salary_list:
             debt = item['debt'] if item['debt'] is not None else 0
             month = item['month']
             taken_money = item['taken_money'] if item['taken_money'] is not None else 0
-            print(month)
             # Build message text
             text = (
                 f"🗓 <b>{month}</b>\n"
@@ -127,7 +125,6 @@ async def handle_click(callback_query: CallbackQuery):
     debt = data.get("debt") if data.get("debt") is not None else 0
 
     salary_list = data.get("salary_list", [])
-    print(salary_list)
     if not salary_list:
         await callback_query.message.answer("⚠️ Avans ma'lumotlari topilmadi.")
         return
