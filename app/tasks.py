@@ -10,7 +10,7 @@ from app.celery_app import celery
 def process_login_task(telegram_id, username, password):
     import requests
     api = os.getenv('API')
-
+    print(api)
     response = requests.post(f"{api}/api/login2", json={
         "username": username,
         "password": password
@@ -90,23 +90,6 @@ def process_login_task(telegram_id, username, password):
 
             result["parent"] = parent_get.id
             session.commit()
-
-            if parent['children']:
-                for child in parent['children']:
-                    student = session.query(Student).filter(Student.platform_id == child['id']).first()
-                    if not student:
-                        student = Student(platform_id=child['id'], name=child['name'],
-                                          surname=child['surname'])
-                        session.add(student)
-                    else:
-                        student.platform_id = child['id']
-                        student.user_id = None
-                        student.name = child['name']
-                        student.surname = child['surname']
-                    if student not in parent_get.students:
-                        parent_get.students.append(student)
-                    session.commit()
-
     return result
 
 
