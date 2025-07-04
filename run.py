@@ -9,12 +9,23 @@ from app.db import engine, Base
 from app import models
 import os
 from dotenv import load_dotenv
-from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import RedisStorage
+import redis.asyncio as redis  # Redis for async
 
 load_dotenv()
 
+# Bot instance
 bot = Bot(token=os.getenv('TOKEN'))
-dp = Dispatcher(storage=MemoryStorage())
+
+# Redis FSM Storage setup (DB 2)
+redis_pool = redis.from_url(
+    f"redis://{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}/{os.getenv('REDIS_DB_BOT')}"
+)
+storage = RedisStorage(redis=redis_pool)
+
+# Dispatcher with Redis FSM
+dp = Dispatcher(storage=storage)
+
 api = os.getenv('API')
 
 
@@ -32,14 +43,8 @@ async def init_models():
         await conn.run_sync(Base.metadata.create_all)
 
 
-# run this once on startup
-
-
 if __name__ == "__main__":
-    # logging.basicConfig(level=logging.INFO)
     try:
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         print('Bot stopped')
-        pass
-    # asyncio.run(main())
