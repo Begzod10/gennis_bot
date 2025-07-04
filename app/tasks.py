@@ -123,7 +123,7 @@ def send_balance_to_users():
                         continue
 
                     try:
-                        response = requests.get(f'{api}/api/bot_student_balance/{platform_id}/{user.user_type}')
+                        response = requests.get(f'{api}/api/bot_user_balance/{platform_id}/{user.user_type}')
                         if user.user_type == "teacher" or user.user_type == "student":
 
                             balance = response.json().get('balance')
