@@ -34,8 +34,11 @@ async def cmd_start(message: Message, state: FSMContext):
         "   • 📄 Har bir oy bo‘yicha tafsilotlarni olish\n\n"
         "👨‍🎓 <b>O‘quvchilar uchun:</b>\n"
         "   • 💳 To‘lovlar ro‘yxatini kuzatish\n"
-        "   • 🎯 Test natijalari va\n"
+        "   • 🎯 Test natijalari\n"
         "   • 📝 Davomat statistikasini ko‘rish\n\n"
+        "👨‍👩‍👧‍👦 <b>Ota-onalar uchun:</b>\n"
+        "   • 👨‍🎓 Farzandingizning test natijalari va davomatini ko‘rish\n"
+        "   • 💳 To‘lov holatini nazorat qilish\n\n"
         "🔐 Botdan foydalanish uchun tizimga kiring.\n"
         "👇 Davom etish uchun quyidagi tugmani bosing:",
         parse_mode="HTML",
