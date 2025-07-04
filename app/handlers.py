@@ -16,6 +16,10 @@ from app.teacher.keyboards import teacher_basic_reply_keyboard
 from app.parent.keyboards import generate_student_keyboard_for_parent
 from app.states import LoginStates, MenuStates
 from .utils import get_user_data
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 router = Router()
 router.message.outer_middleware(TestMiddleware())
@@ -124,7 +128,7 @@ async def exit(message: Message, state: FSMContext):
 
 @router.message(F.text == "📚 Darslar ro‘yhati")
 async def get_darslar_royxati(message: Message):
-    from run import api
+    api = os.getenv('API')
     telegram_user = message.from_user
     telegram_id = telegram_user.id
     get_user, teacher, student, parent = get_user_data(telegram_id)
@@ -163,7 +167,7 @@ async def get_darslar_royxati(message: Message):
 
 @router.message(F.text == "👤 Mening hisobim")
 async def get_balance(message: Message):
-    from run import api
+    api = os.getenv('API')
     telegram_user = message.from_user
     telegram_id = telegram_user.id
     get_user, teacher, student, parent = get_user_data(telegram_id)
