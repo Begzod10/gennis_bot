@@ -20,4 +20,11 @@ celery.conf.beat_schedule = {
     },
 }
 
+# celery.conf.beat_schedule = {
+#     'send-balance-every-minute': {
+#         'task': 'app.tasks.send_balance_to_users',
+#         'schedule': crontab(),  # This runs the task every minute
+#     },
+# }
+
 celery.conf.timezone = 'Asia/Tashkent'  # Optional but recommended
