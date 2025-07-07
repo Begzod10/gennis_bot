@@ -111,29 +111,30 @@ def send_balance_to_users():
                 for user in users:
                     if user.user_type == 'student':
                         student = session.query(Student).filter(Student.user_id == user.id).first()
-                        platform_id = student.platform_id
+                        platform_id = student.platform_id if student else None
                     elif user.user_type == 'teacher':
                         teacher = session.query(Teacher).filter(Teacher.user_id == user.id).first()
-                        platform_id = teacher.platform_id
+                        platform_id = teacher.platform_id if teacher else None
                     elif user.user_type == 'parent':
                         parent = session.query(Parent).filter(Parent.user_id == user.id).first()
-                        platform_id = parent.platform_id
+                        platform_id = parent.platform_id if parent else None
                     else:
                         continue
 
                     try:
-                        response = requests.get(f'{api}/api/bot_user_balance/{platform_id}/{user.user_type}')
-                        if user.user_type == "teacher" or user.user_type == "student":
+                        if platform_id:
+                            response = requests.get(f'{api}/api/bot_user_balance/{platform_id}/{user.user_type}')
+                            if user.user_type == "teacher" or user.user_type == "student":
 
-                            balance = response.json().get('balance')
-                            text = f"📢 Sizning hisobingiz: {balance} so'm"
-                            await bot.send_message(chat_id=user.telegram_id, text=text)
-                        else:
-                            student_list = response.json().get('student_list')
-                            for student in student_list:
-                                balance = student.get('balance')
-                                text = f"📢 {student.get('name')}ning hisobi: {balance} so'm"
+                                balance = response.json().get('balance')
+                                text = f"📢 Sizning hisobingiz: {balance} so'm"
                                 await bot.send_message(chat_id=user.telegram_id, text=text)
+                            else:
+                                student_list = response.json().get('student_list')
+                                for student in student_list:
+                                    balance = student.get('balance')
+                                    text = f"📢 {student.get('name')}ning hisobi: {balance} so'm"
+                                    await bot.send_message(chat_id=user.telegram_id, text=text)
                     except Exception as e:
                         print(f"❌ Failed to send to {user.telegram_id}: {e}")
 
