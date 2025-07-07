@@ -28,3 +28,4 @@ celery.conf.beat_schedule = {
 }
 
 celery.conf.timezone = 'Asia/Tashkent'  # Optional but recommended
+from app import tasks

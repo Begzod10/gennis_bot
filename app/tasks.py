@@ -10,7 +10,6 @@ from app.celery_app import celery
 def process_login_task(telegram_id, username, password):
     import requests
     api = os.getenv('API')
-    print(api)
     response = requests.post(f"{api}/api/login2", json={
         "username": username,
         "password": password
