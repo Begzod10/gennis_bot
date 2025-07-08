@@ -10,11 +10,18 @@ from app.handlers import router
 from app.student.handlers import student_router
 from app.teacher.handlers import teacher_router
 from app.parent.handlers import parent_router
+from app.user.handlers import user_router
 
 load_dotenv()
 
 TOKEN = os.getenv('TOKEN')
 API = os.getenv('API')
+teacher_years_data = {}
+selected_year = {}
+user_years_data = {}
+user_months_data = {}
+datas = {}
+selected_month = {}
 
 
 async def main():
@@ -29,6 +36,7 @@ async def main():
     dp = Dispatcher(storage=storage)
 
     # Register all routers
+    dp.include_router(user_router)
     dp.include_router(router)
     dp.include_router(student_router)
     dp.include_router(teacher_router)

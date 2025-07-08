@@ -28,7 +28,7 @@ async def get_oyliklar_royxati(message: Message, state: FSMContext):
         get_user = session.query(User).filter(User.telegram_id == telegram_id).first()
         teacher = session.query(Teacher).filter(Teacher.user_id == get_user.id).first()
 
-        response = requests.get(f'{api}/api/bot_teacher_salary_years/{teacher.platform_id}')
+        response = requests.get(f'{api}/api/bot/teachers/salary/years/{teacher.platform_id}')
         data = response.json()
 
         years = data.get('years', [])
@@ -49,7 +49,7 @@ async def handle_dynamic_year_selection(message: Message):
         get_user = session.query(User).filter(User.telegram_id == telegram_id).first()
         teacher = session.query(Teacher).filter(Teacher.user_id == get_user.id).first()
 
-        response = requests.get(f'{api}/api/bot_teacher_salary/{teacher.platform_id}/{year}')
+        response = requests.get(f'{api}/api/bot/teachers/salary/{teacher.platform_id}/{year}')
         data = response.json()
 
         if not data or not data[0].get('salary_list'):
@@ -106,7 +106,7 @@ async def handle_click(callback_query: CallbackQuery):
     _, teacher_id, salary_id, month = callback_query.data.split(":")
     await callback_query.answer()
 
-    response = requests.get(f'{api}/api/bot_teacher_salary_details/{teacher_id}/{salary_id}')
+    response = requests.get(f'{api}/api/bot/teachers/salary/details/{teacher_id}/{salary_id}')
     data = response.json()
 
     if not data or not isinstance(data, dict) or 'salary_list' not in data:

@@ -15,8 +15,8 @@ student_router = Router()
 user_years_data = {}
 user_months_data = {}
 datas = {}
-selected_year = {}
-selected_month = {}
+selected_student_year = {}
+selected_student_month = {}
 load_dotenv()
 
 
@@ -27,7 +27,7 @@ async def get_payments_list(message: Message):
     telegram_id = telegram_user.id
 
     student = get_student(telegram_id)
-    response = requests.get(f'{api}/api/bot_student_payments/{student.platform_id}')
+    response = requests.get(f'{api}/api/bot/students/payments/{student.platform_id}')
     payments = response.json().get('payments', [])
 
     if not payments:
@@ -56,7 +56,7 @@ async def handle_test_results(message: Message):
     api = os.getenv('API')
     telegram_id = message.from_user.id
     student = get_student(telegram_id)
-    response = requests.get(f'{api}/api/bot_student_test_results/{student.platform_id}')
+    response = requests.get(f'{api}/api/bot/students/test/results/{student.platform_id}')
     data = response.json()
     test_results = data.get('test_results', [])
 
@@ -102,7 +102,7 @@ async def get_davomatlar_royxati(message: Message, state: FSMContext):
     telegram_user = message.from_user
     telegram_id = telegram_user.id
     student = get_student(telegram_id)
-    dates_response = requests.get(f'{api}/api/student_attendance_dates/{student.platform_id}')
+    dates_response = requests.get(f'{api}/api/bot/students/attendance/dates/{student.platform_id}')
     dates_data = dates_response.json()['data']
     user_years_data[telegram_id] = dates_data['years']
     user_months_data[telegram_id] = dates_data['months']
@@ -117,8 +117,8 @@ async def handle_dynamic_year_selection(message: Message):
     telegram_id = message.from_user.id
     year = message.text
     await message.answer(f"✅ Siz {year} yilni tanladingiz!")
-    selected_year[telegram_id] = year
-    months_keyboard = create_months_inline_keyboard(datas.get(telegram_id), selected_year[telegram_id])
+    selected_student_year[telegram_id] = year
+    months_keyboard = create_months_inline_keyboard(datas.get(telegram_id), selected_student_year[telegram_id])
     await message.answer("✅ Shu yilning oylarini tanlang:", reply_markup=months_keyboard)
 
 
@@ -129,10 +129,10 @@ async def handle_month_selection(callback: types.CallbackQuery):
     telegram_id = callback.from_user.id
     month = callback.data.split("_")[1]
     await callback.message.answer(f"✅ Siz {month} oyini tanladingiz!")
-    selected_month[telegram_id] = month
+    selected_student_month[telegram_id] = month
     student = get_student(telegram_id)
     response = requests.get(
-        f'{api}/api/bot_student_attendances/{student.platform_id}/{selected_year[telegram_id]}/{selected_month[telegram_id]}')
+        f'{api}/api/bot/students/attendances/{student.platform_id}/{selected_student_year[telegram_id]}/{selected_student_month[telegram_id]}')
     tables = response.json()['attendances']
 
     if not tables:
@@ -167,5 +167,5 @@ async def handle_month_selection(callback: types.CallbackQuery):
 
     await callback.message.answer(text, parse_mode="HTML")
 
-    months_keyboard = create_months_inline_keyboard(datas.get(telegram_id), selected_year[telegram_id])
+    months_keyboard = create_months_inline_keyboard(datas.get(telegram_id), selected_student_year[telegram_id])
     await callback.message.answer("✅ Yana oy tanlang:", reply_markup=months_keyboard)

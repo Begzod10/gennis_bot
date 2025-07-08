@@ -18,7 +18,7 @@ load_dotenv()
 
 def generate_student_keyboard_for_parent(parent: Parent, telegram_id: int) -> ReplyKeyboardMarkup:
     api = os.getenv('API')
-    response = requests.get(f'{api}/api/bot_parents_students/{parent.platform_id}')
+    response = requests.get(f'{api}/api/bot/parents/students/{parent.platform_id}')
     children = response.json()['children']
     buttons = []
     redis_key = f"parent:{telegram_id}:student_map"

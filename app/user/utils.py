@@ -8,7 +8,6 @@ from sqlalchemy.orm import joinedload
 
 def get_user_data(telegram_id):
     value = redis_client.get(f"parent:{telegram_id}:selected_student")
-    print("value", value)
     with SessionLocal() as session:
         get_user = session.query(User).filter(User.telegram_id == telegram_id).first()
         teacher = session.query(Teacher).filter(Teacher.user_id == get_user.id).first()
