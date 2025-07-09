@@ -14,8 +14,10 @@ parent_router = Router()
 async def handle_student_selection(message: types.Message):
     telegram_id = message.from_user.id
     selected_label = message.text.strip()
-
     redis_key = f"parent:{telegram_id}:student_map"
+
+    if not redis_client.hexists(redis_key, selected_label):
+        return  # Skip unrelated messages
     value = redis_client.hget(redis_key, selected_label)
     if value:
         data = json.loads(value)

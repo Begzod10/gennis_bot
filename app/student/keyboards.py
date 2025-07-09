@@ -17,8 +17,12 @@ student_basic_reply_keyboard = ReplyKeyboardMarkup(
         ],
         [
             KeyboardButton(text="📝 Davomatlar ro‘yhati"),
-            KeyboardButton(text="🚪 Chiqish"),
+            KeyboardButton(text="📊 Baholar")
+
         ],
+        [
+            KeyboardButton(text="🚪 Chiqish"),
+        ]
     ],
     resize_keyboard=True,
     input_field_placeholder="👆 Birini tanlang!"
@@ -35,8 +39,11 @@ student_basic_reply_keyboard_for_parent = ReplyKeyboardMarkup(
         ],
         [
             KeyboardButton(text="📝 Davomatlar ro‘yhati"),
-            KeyboardButton(text="⬅️ Ortga qaytish"),
+            KeyboardButton(text="📊 Baholar")
         ],
+        [
+            KeyboardButton(text="⬅️ Ortga qaytish"),
+        ]
     ],
     resize_keyboard=True,
     input_field_placeholder="👆 Birini tanlang!"
@@ -46,20 +53,15 @@ student_basic_reply_keyboard_for_parent = ReplyKeyboardMarkup(
 def create_months_inline_keyboard(data, selected_year=None):
     year = data['current_year'] if not selected_year else selected_year
     months_list = []
-    print("data['months']", type(data['months']))
-
     months_data = data['months']
 
-    # Ensure it's always a list
     if isinstance(months_data, dict):
         months_data = [months_data]
-    pprint.pprint(months_data)
+
     for item in months_data:
         if int(item['year']) == int(year):
             months_list = item['months']
             break
-
-    # Build the keyboard rows as a list of rows
     keyboard = []
     row = []
     for i, month in enumerate(months_list):
@@ -72,6 +74,9 @@ def create_months_inline_keyboard(data, selected_year=None):
         keyboard.append(row)
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+
 
 
 def create_years_reply_keyboard(data):

@@ -7,16 +7,17 @@ import os
 from dotenv import load_dotenv
 from aiogram.fsm.context import FSMContext
 from aiogram import Router
-
+from aiogram.filters import StateFilter
 from app.states import MenuStates
 from .utils import get_student
 
 student_router = Router()
-user_years_data = {}
-user_months_data = {}
-datas = {}
+years_data = {}
+dates_info = {}
+
 selected_student_year = {}
 selected_student_month = {}
+user_mode = {}
 load_dotenv()
 
 
@@ -99,73 +100,128 @@ async def handle_test_results(message: Message):
 async def get_davomatlar_royxati(message: Message, state: FSMContext):
     api = os.getenv('API')
     await state.set_state(MenuStates.attendances)
-    telegram_user = message.from_user
-    telegram_id = telegram_user.id
+
+    telegram_id = message.from_user.id
     student = get_student(telegram_id)
-    dates_response = requests.get(f'{api}/api/bot/students/attendance/dates/{student.platform_id}')
-    dates_data = dates_response.json()['data']
-    user_years_data[telegram_id] = dates_data['years']
-    user_months_data[telegram_id] = dates_data['months']
-    datas[telegram_id] = dates_data
+    response = requests.get(f'{api}/api/bot/students/attendance/dates/{student.platform_id}')
+    dates_data = response.json()['data']
+
+    await state.update_data(
+        mode="attendance",
+        years=dates_data['years'],
+        dates_info=dates_data,
+        selected_year=None,
+        selected_month=None
+    )
 
     years_keyboard = create_years_reply_keyboard(dates_data)
     await message.answer("✅ Yilni tanlang:", reply_markup=years_keyboard)
 
 
-@student_router.message(lambda message: message.text in user_years_data.get(message.from_user.id, []))
-async def handle_dynamic_year_selection(message: Message):
+@student_router.message(lambda msg: msg.text and "baholar" in msg.text.lower())
+async def get_baholar(message: Message, state: FSMContext):
+    api = os.getenv('API')
+    await state.set_state(MenuStates.scores)
+
     telegram_id = message.from_user.id
-    year = message.text
-    await message.answer(f"✅ Siz {year} yilni tanladingiz!")
-    selected_student_year[telegram_id] = year
-    months_keyboard = create_months_inline_keyboard(datas.get(telegram_id), selected_student_year[telegram_id])
-    await message.answer("✅ Shu yilning oylarini tanlang:", reply_markup=months_keyboard)
+    student = get_student(telegram_id)
+    response = requests.get(f'{api}/api/bot/students/attendance/dates/{student.platform_id}')
+    dates_data = response.json()['data']
+
+    await state.update_data(
+        mode="scores",
+        years=dates_data['years'],
+        dates_info=dates_data,
+        selected_year=None,
+        selected_month=None
+    )
+
+    years_keyboard = create_years_reply_keyboard(dates_data)
+    await message.answer("✅ Yilni tanlang:", reply_markup=years_keyboard)
+
+
+@student_router.message(StateFilter(MenuStates.attendances, MenuStates.scores))
+async def handle_dynamic_year_selection(message: Message, state: FSMContext):
+    data = await state.get_data()
+    if not data.get("years"):
+        return
+
+    if message.text in data["years"]:
+        await state.update_data(selected_year=message.text)
+
+        months_keyboard = create_months_inline_keyboard(
+            data["dates_info"], message.text
+        )
+        await message.answer(f"✅ Siz {message.text} yilni tanladingiz!")
+        await message.answer("✅ Shu yilning oylarini tanlang:", reply_markup=months_keyboard)
 
 
 @student_router.callback_query(lambda c: c.data.startswith("month_"))
-async def handle_month_selection(callback: types.CallbackQuery):
-    api = os.getenv('API')
-    telegram_user = callback.message.from_user
+async def handle_month_selection(callback: types.CallbackQuery, state: FSMContext):
+    api = os.getenv("API")
     telegram_id = callback.from_user.id
     month = callback.data.split("_")[1]
+
     await callback.message.answer(f"✅ Siz {month} oyini tanladingiz!")
-    selected_student_month[telegram_id] = month
+    data = await state.get_data()
+    await state.update_data(selected_month=month)
+
     student = get_student(telegram_id)
-    response = requests.get(
-        f'{api}/api/bot/students/attendances/{student.platform_id}/{selected_student_year[telegram_id]}/{selected_student_month[telegram_id]}')
-    tables = response.json()['attendances']
+    year = data.get("selected_year")
+    mode = data.get("mode")
 
-    if not tables:
-        await callback.message.answer("⚠️ Davomat topilmadi.")
-        return
-    text = f"📅 <b>{student.name}, sizning davomat jadvalingiz:</b>\n\n"
+    if mode == "attendance":
+        response = requests.get(f'{api}/api/bot/students/attendances/{student.platform_id}/{year}/{month}')
+        tables = response.json().get("attendances", [])
 
-    for table in tables:
-        text += f"🔷 <b>{table['subject']} ({table['name']})</b>\n"
-        text += f"👨‍🏫 O'qituvchi: <i>{table['teacher']}</i>\n"
-        text += "📚 <b>Darslar:</b>\n"
+        if not tables:
+            await callback.message.answer("⚠️ Davomat topilmadi.")
+            return
 
-        for attendance in table['attendances']:
-            if attendance['ball_status'] == 1 or attendance['ball_status'] == 2:
-                text += f"  🔹 <b>{attendance['day']}</b> ✅ \n"
+        text = f"📅 <b>{student.name}, sizning davomat jadvalingiz:</b>\n\n"
+        for table in tables:
+            text += f"🔷 <b>{table['subject']} ({table['name']})</b>\n"
+            text += f"👨‍🏫 O'qituvchi: <i>{table['teacher']}</i>\n📚 <b>Darslar:</b>\n"
+            for attendance in table['attendances']:
+                status_icon = "✅" if attendance["ball_status"] in [1, 2] else "❌"
+                text += f"  🔹 <b>{attendance['day']}</b> {status_icon}\n"
+                if attendance["ball_status"] == 2:
+                    text += f"    📌 Uy ishi: {attendance['homework']}\n"
+                    if attendance.get("dictionary"):
+                        text += f"    📖 Lug'at: {attendance['dictionary']}\n"
+                    text += f"    🎯 Aktivlik: {attendance['activeness']}\n"
+            text += "━" * 25 + "\n\n"
+        await callback.message.answer(text, parse_mode="HTML")
+
+    else:  # scores mode
+        response = requests.get(f'{api}/api/bot/students/scores/{student.platform_id}/{year}/{month}')
+        tables = response.json().get("score_list", [])
+
+        if not tables:
+            await callback.message.answer("⚠️ Baholar topilmadi.")
+            return
+
+        text = f"📊 <b>{student.name}, {month} oyidagi baholar:</b>\n\n"
+        for table in tables:
+            text += f"🔷 <b>{table['subject']} ({table['name']})</b>\n"
+            text += f"👨‍🏫 O'qituvchi: <i>{table['teacher']}</i>\n"
+            text += f"📈 O'rtacha ball: <b>{table['average_ball']}</b>\n"
+
+            if not table['score']:
+                text += "⚠️ Baholar mavjud emas.\n"
             else:
-                text += f"  🔹 <b>{attendance['day']}</b> ❌ \n"
-            if attendance['ball_status'] == 2:
-                if attendance['dictionary']:
-                    text += (
-                        f"    📌 <b>Uy ishi:</b> {attendance['homework']}\n"
-                        f"    📖 <b>Lug'at:</b> {attendance['dictionary']}\n"
-                        f"    🎯 <b>Aktiv:</b> {attendance['activeness']}\n"
-                    )
-                else:
-                    text += (
-                        f"    📌 <b>Uy ishi:</b> {attendance['homework']}\n"
-                        f"    🎯 <b>Aktiv:</b> {attendance['activeness']}\n"
-                    )
+                text += "📚 <b>Darslar bo‘yicha baholar:</b>\n"
+                for score in table['score']:
+                    text += f"  🔹 <b>{score['day']}</b> ✅\n"
+                    text += f"    📌 Uy ishi: {score['homework']}\n"
+                    text += f"    🎯 Aktivlik: {score['activeness']}\n"
+                    if table.get("dictionary_status"):
+                        text += f"    📖 Lug‘at: {score['dictionary']}\n"
+            text += "━" * 25 + "\n\n"
 
-        text += "━" * 25 + "\n\n"
+        await callback.message.answer(text, parse_mode="HTML")
 
-    await callback.message.answer(text, parse_mode="HTML")
-
-    months_keyboard = create_months_inline_keyboard(datas.get(telegram_id), selected_student_year[telegram_id])
+    months_keyboard = create_months_inline_keyboard(
+        data["dates_info"], data["selected_year"]
+    )
     await callback.message.answer("✅ Yana oy tanlang:", reply_markup=months_keyboard)

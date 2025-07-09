@@ -36,8 +36,8 @@ async def main():
     dp = Dispatcher(storage=storage)
 
     # Register all routers
-    dp.include_router(user_router)
     dp.include_router(router)
+    dp.include_router(user_router)
     dp.include_router(student_router)
     dp.include_router(teacher_router)
     dp.include_router(parent_router)

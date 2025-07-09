@@ -14,7 +14,7 @@ from .utils import get_user_data
 import os
 from dotenv import load_dotenv
 from app.teacher.handlers import selected_year, teacher_years_data
-from app.student.handlers import user_years_data, user_months_data, datas, selected_student_year, selected_student_month
+from app.student.handlers import years_data, dates_info, selected_student_year, selected_student_month, user_mode
 
 load_dotenv()
 user_router = Router()
@@ -24,13 +24,13 @@ user_router = Router()
 async def exit(message: Message, state: FSMContext):
     telegram_id = message.from_user.id
     await state.clear()
-    user_years_data.pop(telegram_id, None)
-    user_months_data.pop(telegram_id, None)
-    datas.pop(telegram_id, None)
+    years_data.pop(telegram_id, None)
+    dates_info.pop(telegram_id, None)
     selected_student_year.pop(telegram_id, None)
     selected_student_month.pop(telegram_id, None)
     selected_year.pop(telegram_id, None)
     teacher_years_data.pop(telegram_id, None)
+    user_mode.pop(telegram_id, None)
     value = redis_client.get(f"parent:{telegram_id}:selected_student")
     if value:
         redis_client.delete(f"parent:{telegram_id}:selected_student")
@@ -109,10 +109,14 @@ async def back(message: Message, state: FSMContext):
         if current_state == MenuStates.attendances:
             reply = student_basic_reply_keyboard_for_parent
             await state.set_state(MenuStates.menu)
+        elif current_state == MenuStates.scores:
+            reply = student_basic_reply_keyboard_for_parent
         elif current_state == MenuStates.menu:
             reply = generate_student_keyboard_for_parent(parent, telegram_id)
     elif get_user.user_type == 'student':
         if current_state == MenuStates.attendances:
+            reply = student_basic_reply_keyboard
+        elif current_state == MenuStates.scores:
             reply = student_basic_reply_keyboard
     elif get_user.user_type == 'teacher':
         if current_state == MenuStates.salary:
