@@ -71,7 +71,6 @@ async def get_password(message: Message, state: FSMContext):
     user_data = await state.get_data()
     username = user_data['username']
     password = message.text
-    print('test')
     task = process_login_task.delay(telegram_id, username, password)
 
     await message.answer("⏳ Tizimga kirish so‘rovi yuborildi...")
