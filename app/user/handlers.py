@@ -111,6 +111,7 @@ async def back(message: Message, state: FSMContext):
             await state.set_state(MenuStates.menu)
         elif current_state == MenuStates.scores:
             reply = student_basic_reply_keyboard_for_parent
+            await state.set_state(MenuStates.menu)
         elif current_state == MenuStates.menu:
             reply = generate_student_keyboard_for_parent(parent, telegram_id)
     elif get_user.user_type == 'student':
