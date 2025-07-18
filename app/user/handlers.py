@@ -101,9 +101,11 @@ async def get_balance(message: Message):
 @user_router.message(F.text == "⬅️ Ortga qaytish")
 async def back(message: Message, state: FSMContext):
     telegram_user = message.from_user
+    api = os.getenv('API')
     telegram_id = telegram_user.id
     current_state = await state.get_state()
     get_user, teacher, student, parent = get_user_data(telegram_id)
+    requests.get(f'{api}/api/bot/users/telegram_id/{get_user.platform_id}/{get_user.telegram_id}')
     reply = None
     if get_user.user_type == 'parent':
         if current_state == MenuStates.attendances:

@@ -16,12 +16,6 @@ load_dotenv()
 
 TOKEN = os.getenv('TOKEN')
 API = os.getenv('API')
-teacher_years_data = {}
-selected_year = {}
-user_years_data = {}
-user_months_data = {}
-datas = {}
-selected_month = {}
 
 
 async def main():
