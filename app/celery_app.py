@@ -14,9 +14,9 @@ celery = Celery(
 )
 
 celery.conf.beat_schedule = {
-    'send-balance-every-12-hours': {
+    'send-balance-daily-midnight': {
         'task': 'app.tasks.send_balance_to_users',
-        'schedule': crontab(minute=0, hour='0,12'),
+        'schedule': crontab(minute=0, hour=0),  # Runs at 00:00 every day
     },
 }
 
