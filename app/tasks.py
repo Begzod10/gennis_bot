@@ -103,7 +103,7 @@ def format_ball_history(ball_history):
         subject = item.get("subject", "Noma'lum fan")
         average = item.get("average", 0)
         scored_days = item.get("scored_days", 0)
-        history_lines.append(f"📚 {subject} — O'rtacha ball: {average}, Kunlar: {scored_days}")
+        history_lines.append(f"📚 {subject} — O'rtacha ball: {average}, Baholangan kun: {scored_days}")
 
     return "\n" + "\n".join(history_lines)
 
