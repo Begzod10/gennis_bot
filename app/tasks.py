@@ -93,14 +93,30 @@ def process_login_task(telegram_id, username, password):
     return result
 
 
+def format_ball_history(ball_history):
+    """Format ball_history list into readable text."""
+    if not ball_history:
+        return "\n⚠️ Ballar tarixi mavjud emas."
+
+    history_lines = []
+    for item in ball_history:
+        subject = item.get("subject", "Noma'lum fan")
+        average = item.get("average", 0)
+        scored_days = item.get("scored_days", 0)
+        history_lines.append(f"📚 {subject} — O'rtacha ball: {average}, Kunlar: {scored_days}")
+
+    return "\n" + "\n".join(history_lines)
+
+
 @celery.task(name='app.tasks.send_balance_to_users')
 def send_balance_to_users():
     import os
     import requests
     import asyncio
     from aiogram import Bot
-    from app.models import User, Student, Teacher
+    from app.models import User, Student, Teacher, Parent
     from app.db import SessionLocal
+    import pprint
 
     api = os.getenv('API')
     bot = Bot(token=os.getenv('TOKEN'))
@@ -125,17 +141,24 @@ def send_balance_to_users():
                     try:
                         if platform_id:
                             response = requests.get(f'{api}/api/bot/users/balance/list/{platform_id}/{user.user_type}')
-                            if user.user_type == "teacher" or user.user_type == "student":
+                            data = response.json()
 
-                                balance = response.json().get('balance')
+                            if user.user_type in ("teacher", "student"):
+                                balance = data.get('balance')
+                                ball_history = data.get('ball_history')
                                 text = f"📢 Sizning hisobingiz: {balance} so'm"
+                                text += format_ball_history(ball_history)
                                 await bot.send_message(chat_id=user.telegram_id, text=text)
-                            else:
-                                student_list = response.json().get('student_list')
+                            else:  # parent
+                                student_list = data.get('student_list', [])
                                 for student in student_list:
                                     balance = student.get('balance')
+                                    ball_history = student.get('ball_history')
                                     text = f"📢 {student.get('name')}ning hisobi: {balance} so'm"
+                                    text += format_ball_history(ball_history)
+
                                     await bot.send_message(chat_id=user.telegram_id, text=text)
+
                     except Exception as e:
                         print(f"❌ Failed to send to {user.telegram_id}: {e}")
 
