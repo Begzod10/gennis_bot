@@ -13,7 +13,7 @@ from app.teacher.keyboards import teacher_basic_reply_keyboard
 from app.parent.keyboards import generate_student_keyboard_for_parent
 from app.states import LoginStates, MenuStates
 from dotenv import load_dotenv
-
+from asyncio import sleep
 load_dotenv()
 
 router = Router()
