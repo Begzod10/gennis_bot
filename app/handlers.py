@@ -13,7 +13,7 @@ from app.teacher.keyboards import teacher_basic_reply_keyboard
 from app.parent.keyboards import generate_student_keyboard_for_parent
 from app.states import LoginStates, MenuStates
 from dotenv import load_dotenv
-from asyncio import sleep
+
 load_dotenv()
 
 router = Router()
@@ -69,67 +69,44 @@ async def get_username(message: Message, state: FSMContext):
 async def get_password(message: Message, state: FSMContext):
     telegram_id = message.from_user.id
     user_data = await state.get_data()
-    username = user_data["username"]
+    username = user_data['username']
     password = message.text
-
-    # 🔹 Send login task to Celery
     task = process_login_task.delay(telegram_id, username, password)
 
     await message.answer("⏳ Tizimga kirish so‘rovi yuborildi...")
-
-    # 🔹 Poll Celery (max 10 seconds)
-    result = None
-    for _ in range(10):  # 10 × 1s = 10s wait
-        if task.ready():
-            result = task.result
-            break
-        await sleep(1)
-
-    # 🔹 Handle timeout
-    if not result:
-        await message.answer("❌ Tizimdan javob olinmadi. Qayta urinib ko‘ring.")
-        await state.clear()
-        return
-
-    # 🔹 Handle login success
-    if result["success"]:
-        if result["user_type"] == "teacher":
+    result = task.get(timeout=5)  # ⚠️ avoid in production unless background
+    if result['success']:
+        if result['user_type'] == 'teacher':
             reply_keyboard = teacher_basic_reply_keyboard
-
-        elif result["user_type"] == "student":
+        elif result['user_type'] == 'student':
             reply_keyboard = student_basic_reply_keyboard
-
-        elif result["user_type"] == "parent":
-            get_parent = SessionLocal().query(Parent).filter(Parent.id == result["parent"]).first()
+        elif result['user_type'] == 'parent':
+            get_parent = SessionLocal().query(Parent).filter(Parent.id == result['parent']).first()
             reply_keyboard = generate_student_keyboard_for_parent(get_parent, telegram_id)
-            await state.set_state(MenuStates.menu)
 
+            await state.set_state(MenuStates.menu)
         else:
             reply_keyboard = None
-
         emoji = {
             "student": "👨‍🎓",
             "teacher": "🧑‍🏫",
             "parent": "👨‍👩‍👦"
         }.get(result["user_type"], "👨‍💼")
-
         await message.answer(
             f"✅ {emoji} {result['name']} {result['surname']} ({result['user_type']})\n"
-            f"Tizimga kirish muvaffaqiyatli amalga oshirildi",
-            reply_markup=reply_keyboard
+            f"Tizimga kirish muvaffaqiyatli amalga oshirildi", reply_markup=reply_keyboard
         )
 
-    # 🔹 Handle login failure
     else:
         await message.answer("❌ Foydalanuvchi nomi yoki parol xato!", reply_markup=kb.login_keyboard)
         await state.clear()
-
-    # 🔹 Clear state for non-parent users
-    if result["user_type"] != "parent":
+        value = redis_client.get(f"parent:{telegram_id}:selected_student")
+        if value:
+            redis_client.delete(f"parent:{telegram_id}:selected_student")
+    if result['user_type'] != 'parent':
         await state.clear()
+        value = redis_client.get(f"parent:{telegram_id}:selected_student")
+        if value:
+            redis_client.delete(f"parent:{telegram_id}:selected_student")
 
-    # 🔹 Reset Redis parent session if needed
-    value = redis_client.get(f"parent:{telegram_id}:selected_student")
-    if value:
-        redis_client.delete(f"parent:{telegram_id}:selected_student")
 
