@@ -4,16 +4,21 @@ from app.db import SessionLocal
 from app.models import User, Student, Teacher, Parent
 import os
 from app.celery_app import celery
+import logging
 
+logger = logging.getLogger(__name__)
 
 @celery.task(name='app.tasks.process_login_task')
 def process_login_task(telegram_id, username, password):
+    logger.info('taskdan oldin')
+    print('task ishladi')
     import requests
     api = os.getenv('API')
     response = requests.post(f"{api}/api/base/login", json={
         "username": username,
         "password": password
     })
+    print(response)
     parent = response.json().get('parent') if 'parent' in response.json() else None
     result = {
         "success": False,

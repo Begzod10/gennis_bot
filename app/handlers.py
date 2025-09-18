@@ -108,5 +108,3 @@ async def get_password(message: Message, state: FSMContext):
         value = redis_client.get(f"parent:{telegram_id}:selected_student")
         if value:
             redis_client.delete(f"parent:{telegram_id}:selected_student")
-
-
