@@ -121,6 +121,8 @@ async def back(message: Message, state: FSMContext):
             reply = student_basic_reply_keyboard
         elif current_state == MenuStates.scores:
             reply = student_basic_reply_keyboard
+        else:
+            reply = student_basic_reply_keyboard
     elif get_user.user_type == 'teacher':
         if current_state == MenuStates.salary:
             reply = teacher_basic_reply_keyboard
