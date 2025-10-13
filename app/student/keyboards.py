@@ -48,7 +48,17 @@ student_basic_reply_keyboard_for_parent = ReplyKeyboardMarkup(
     resize_keyboard=True,
     input_field_placeholder="👆 Birini tanlang!"
 )
-
+student_basic_reply_keyboard_test_type= ReplyKeyboardMarkup(
+    keyboard=[
+   [ KeyboardButton(text="🖥️ Onlayn test natijalari"),
+    KeyboardButton(text="📄 Offlayn test natijalari"),
+],
+        [
+            KeyboardButton(text="⬅️ Ortga qaytish"),]
+],
+resize_keyboard = True,
+input_field_placeholder = "👆 Birini tanlang!"
+)
 
 def create_months_inline_keyboard(data, selected_year=None):
     year = data['current_year'] if not selected_year else selected_year

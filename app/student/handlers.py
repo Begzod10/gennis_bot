@@ -2,7 +2,8 @@ from aiogram import F, types
 from aiogram.types import Message
 import requests
 import pprint
-from .keyboards import create_years_reply_keyboard, create_months_inline_keyboard, student_basic_reply_keyboard
+from .keyboards import create_years_reply_keyboard, create_months_inline_keyboard, student_basic_reply_keyboard, \
+    student_basic_reply_keyboard_test_type
 import os
 from dotenv import load_dotenv
 from aiogram.fsm.context import FSMContext
@@ -53,6 +54,12 @@ async def get_payments_list(message: Message):
 
 
 @student_router.message(F.text.startswith("🎯 Test natijalari"))
+async def test_types(message: Message):
+    await message.answer(
+        "👆 Iltimos, quyidagilardan birini tanlang:",
+        reply_markup=student_basic_reply_keyboard_test_type
+    )
+@student_router.message(F.text=="📄 Offlayn test natijalari")
 async def handle_test_results(message: Message):
     api = os.getenv('API')
     telegram_id = message.from_user.id
@@ -92,6 +99,36 @@ async def handle_test_results(message: Message):
                 text += "━" * 20 + "\n"
 
         text += "═" * 25 + "\n\n"
+
+    await message.answer(text, parse_mode="HTML")
+
+
+@student_router.message(F.text=="🖥️ Onlayn test natijalari")
+async def handle_online_test_results(message: Message):
+    api = os.getenv('API')
+    telegram_id = message.from_user.id
+    student = get_student(telegram_id)
+    response = requests.get(f'https://classroom.gennis.uz/api/pisa/student/pisa/results/{student.platform_id}')
+    data = response.json()
+
+    test_results = data.get('data', [])
+
+    if not test_results:
+        await message.answer("⚠️ Onlayn test natijalari topilmadi.")
+        return
+
+    text = f"💻 <b>{student.name}, onlayn test natijalari:</b>\n\n"
+    for result in test_results:
+        text += (
+            f"📅 <b>Sana:</b> {result['test_date']}\n"
+            f"📚 <b>Test nomi:</b> {result['pisa_name']}\n"
+            f"✅ <b>To‘g‘ri javoblar:</b> {result['true_answers']} ta\n"
+            f"❌ <b>Noto‘g‘ri javoblar:</b> {result['false_answers']} ta\n"
+            f"📊 <b>Natija:</b> {result['result']}%\n"
+            f"📋 <b>Savollar soni:</b> {result['total_questions']} ta\n"
+            f"🌍 <b>Joylashuv:</b> {result['location']['name']}\n"
+        )
+        text += "━" * 20 + "\n"
 
     await message.answer(text, parse_mode="HTML")
 
