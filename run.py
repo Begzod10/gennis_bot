@@ -6,6 +6,7 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 import redis.asyncio as redis
 
+
 from app.handlers import router
 from app.student.handlers import student_router
 from app.teacher.handlers import teacher_router
