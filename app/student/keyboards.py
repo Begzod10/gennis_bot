@@ -22,7 +22,7 @@ student_basic_reply_keyboard = ReplyKeyboardMarkup(
         ],
         [
             KeyboardButton(text="🚪 Chiqish"),
-            KeyboardButton(text="test boshlash"),
+            [KeyboardButton(text="📝 Testni boshlash")],
 
         ]
     ],
@@ -44,8 +44,9 @@ student_basic_reply_keyboard_for_parent = ReplyKeyboardMarkup(
             KeyboardButton(text="📊 Baholar")
         ],
         [
+            [KeyboardButton(text="📝 Testni boshlash")],
             KeyboardButton(text="⬅️ Ortga qaytish"),
-            KeyboardButton(text="test boshlash"),
+
         ]
     ],
     resize_keyboard=True,
