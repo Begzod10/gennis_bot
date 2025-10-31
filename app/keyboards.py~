@@ -4,6 +4,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 login_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="🔐 Tizimga kirish")],
+        [KeyboardButton(text="📝 Testni boshlash")]
     ],
     resize_keyboard=True,
     input_field_placeholder="👇 Davom etish uchun tugmani tanlang!"
