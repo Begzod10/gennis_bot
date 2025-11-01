@@ -5,10 +5,8 @@ import asyncio
 
 test = Router()
 
-# === TEST VARIANTLARI ===
 TEST_VARIANTS = ["Kimyo", "Ingliz tili", "HTML/CSS", "JavaScript", "Python", "Biologiya"]
 
-# === HTML/CSS TEST SAVOLLARI ===
 HTML_TEST = [
     {"q": "1️⃣ HTML5’da &lt;section&gt; va &lt;div&gt; teglari orasidagi farq nimada?",
      "options": ["Ikkalasi ham bir xil ishlaydi",
@@ -41,7 +39,7 @@ HTML_TEST = [
 
 active_questions = {}
 
-# === TESTNI BOSHLASH HANDLER ===
+
 @test.message(F.text == "📝 Testni boshlash")
 async def start_test_handler(message: types.Message, state: FSMContext):
     builder = InlineKeyboardBuilder()
@@ -49,10 +47,10 @@ async def start_test_handler(message: types.Message, state: FSMContext):
         builder.button(text=variant, callback_data=f"variant_{variant}")
     builder.adjust(2)
 
-    await message.answer("🧠 Qaysi testni tanlaysiz?", reply_markup=builder.as_markup())
+    await message.answer("Qaysi testni tanlaysiz?", reply_markup=builder.as_markup())
     await state.clear()
 
-# === VARIANT TANLASH HANDLER ===
+
 @test.callback_query(F.data.startswith("variant_"))
 async def choose_variant(callback: types.CallbackQuery, state: FSMContext):
     variant = callback.data.split("_")[1]
@@ -67,7 +65,7 @@ async def choose_variant(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
     await send_question(callback.message, state)
 
-# === SAVOL CHIQARISH FUNKSIYASI ===
+
 async def send_question(message: types.Message, state: FSMContext):
     data = await state.get_data()
     index = data.get("index", 0)
@@ -78,7 +76,7 @@ async def send_question(message: types.Message, state: FSMContext):
     if index >= len(questions):
         total = len(questions)
         percent = (correct / total) * 100
-        await message.answer(f"🎉 Test tugadi!\n\n🏁 Sizning natijangiz: {correct}/{total} ({percent:.1f}%)")
+        # await message.answer(f"🎉 Test tugadi!\n\n🏁 Sizning natijangiz: {correct}/{total} ({percent:.1f}%)")
         await state.clear()
         return
 
@@ -89,24 +87,22 @@ async def send_question(message: types.Message, state: FSMContext):
     builder.adjust(1)
 
     msg = await message.answer(
-        f"🧩 <b>{q['q']}</b>\n⏳ <b>10 soniya qoldi</b>",
+        f"<b>{q['q']}</b>\n⏳ <b>10 soniya qoldi</b>",
         parse_mode="HTML",
         reply_markup=builder.as_markup()
     )
 
-    # Countdown funksiyasi
     async def countdown():
         for sec in range(9, 0, -1):
             try:
                 await asyncio.sleep(1)
                 await msg.edit_text(
-                    f"🧩 <b>{q['q']}</b>\n⏳ <b>{sec} soniya qoldi</b>",
+                    f"<b>{q['q']}</b>\n⏳ <b>{sec} soniya qoldi</b>",
                     parse_mode="HTML",
                     reply_markup=builder.as_markup()
                 )
             except Exception:
                 return
-        # Timeout tugadi, avtomatik keyingi savol
         data = await state.get_data()
         if data.get("index", 0) == index:
             await state.update_data(index=index + 1)
@@ -115,10 +111,9 @@ async def send_question(message: types.Message, state: FSMContext):
     task = asyncio.create_task(countdown())
     active_questions[msg.message_id] = task
 
-# === JAVOB QABUL QILISH HANDLER ===
+
 @test.callback_query(F.data.startswith("answer_"))
 async def handle_answer(callback: types.CallbackQuery, state: FSMContext):
-    # Timeout taskini bekor qilish
     task = active_questions.pop(callback.message.message_id, None)
     if task:
         task.cancel()
