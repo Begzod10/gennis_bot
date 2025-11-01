@@ -5,68 +5,61 @@ import asyncio
 
 test = Router()
 
-# === TEST SAVOLLARI ===
+# Test variantlari
+TEST_VARIANTS = ["Kimyo", "Ingliz tili", "HTML/CSS", "JavaScript", "Python", "Biologiya"]
+
+# HTML testi savollari
 HTML_TEST = [
-    {
-        "q": "1️⃣ HTML5’da <section> va <div> teglari orasidagi farq nimada?",
-        "options": [
-            "Ikkalasi ham bir xil ishlaydi",
-            "<section> semantik teg, <div> esa semantik emas",
-            "<div> faqat matn uchun ishlatiladi",
-            "Ikkalasi ham table ichida ishlaydi",
-        ],
-        "answer": 1
-    },
-    {
-        "q": "2️⃣ <canvas> tegi nima uchun ishlatiladi?",
-        "options": [
-            "Video joylash uchun",
-            "Matn formatlash uchun",
-            "Rasm va grafik chizish uchun",
-            "Formani yuborish uchun"
-        ],
-        "answer": 2
-    },
-    {
-        "q": "3️⃣ HTML’da accessibility uchun qaysi atribut ishlatiladi?",
-        "options": ["aria-label", "alt-text", "screen-reader", "access-attr"],
-        "answer": 0
-    },
-    {
-        "q": "4️⃣ <meta charset='UTF-8'> tegi nima qiladi?",
-        "options": [
-            "Brauzerga sahifa kengligini belgilaydi",
-            "Tegishli script faylini ulaydi",
-            "Veb sahifa kodlash turini belgilaydi",
-            "Sahifa yuklanish vaqtini belgilaydi"
-        ],
-        "answer": 2
-    },
-    {
-        "q": "5️⃣ <picture> tegi nimaga xizmat qiladi?",
-        "options": [
-            "Turli ekran o‘lchamlariga mos rasm tanlash uchun",
-            "Rasmlarni guruhlash uchun",
-            "Rasm ustiga matn yozish uchun",
-            "Videoni o‘rnatish uchun"
-        ],
-        "answer": 0
-    },
+    {"q": "1️⃣ HTML5’da <section> va <div> teglari orasidagi farq nimada?",
+     "options": ["Ikkalasi ham bir xil ishlaydi",
+                 "<section> semantik teg, <div> esa semantik emas",
+                 "<div> faqat matn uchun ishlatiladi",
+                 "Ikkalasi ham table ichida ishlaydi"],
+     "answer": 1},
+    {"q": "2️⃣ <canvas> tegi nima uchun ishlatiladi?",
+     "options": ["Video joylash uchun",
+                 "Matn formatlash uchun",
+                 "Rasm va grafik chizish uchun",
+                 "Formani yuborish uchun"],
+     "answer": 2},
+    {"q": "3️⃣ HTML’da accessibility uchun qaysi atribut ishlatiladi?",
+     "options": ["aria-label", "alt-text", "screen-reader", "access-attr"],
+     "answer": 0},
+    {"q": "4️⃣ <meta charset='UTF-8'> tegi nima qiladi?",
+     "options": ["Brauzerga sahifa kengligini belgilaydi",
+                 "Tegishli script faylini ulaydi",
+                 "Veb sahifa kodlash turini belgilaydi",
+                 "Sahifa yuklanish vaqtini belgilaydi"],
+     "answer": 2},
+    {"q": "5️⃣ <picture> tegi nimaga xizmat qiladi?",
+     "options": ["Turli ekran o‘lchamlariga mos rasm tanlash uchun",
+                 "Rasmlarni guruhlash uchun",
+                 "Rasm ustiga matn yozish uchun",
+                 "Videoni o‘rnatish uchun"],
+     "answer": 0},
 ]
 
 
 # === TEST BOSHLASH HANDLER ===
 @test.message(F.text == "📝 Testni boshlash")
 async def start_test_handler(message: types.Message, state: FSMContext):
-    msg = await message.answer("🧠 HTML testi boshlanmoqda...\n\n⏳ 5 soniyadan keyin birinchi savol chiqadi!")
+    builder = InlineKeyboardBuilder()
+    for variant in TEST_VARIANTS:
+        builder.button(text=variant, callback_data=f"variant_{variant}")
+    builder.adjust(2)  # 2 ustun bo‘lsin
 
-    # Taymer animatsiyasi
-    for i in range(5, 0, -1):
-        await msg.edit_text(f"⏳ <b>{i} soniya qoldi...</b>", parse_mode="HTML")
-        await asyncio.sleep(1)
+    await message.answer("🧠 Qaysi testni tanlaysiz?", reply_markup=builder.as_markup())
+    await state.clear()
 
+
+# === VARIANT TANLASH HANDLER ===
+@test.callback_query(F.data.startswith("variant_"))
+async def choose_variant(callback: types.CallbackQuery, state: FSMContext):
+    variant = callback.data.split("_")[1]
+    await callback.message.answer(f"📝 {variant} testi boshlanmoqda!")
     await state.update_data(index=0, correct=0)
-    await send_question(message, state)
+    await callback.answer()
+    await send_question(callback.message, state)
 
 
 # === SAVOL CHIQARISH FUNKSIYASI ===
@@ -91,8 +84,14 @@ async def send_question(message: types.Message, state: FSMContext):
 
     await message.answer(f"🧩 <b>{q['q']}</b>", parse_mode="HTML", reply_markup=builder.as_markup())
 
+    # ✅ 10 soniyadan keyin avtomatik keyingi savol
+    await asyncio.sleep(10)
+    data = await state.get_data()
+    await state.update_data(index=index + 1)
+    await send_question(message, state)
 
-# === JAVOBNI QABUL QILISH HANDLER ===
+
+# === JAVOB QABUL QILISH HANDLER ===
 @test.callback_query(F.data.startswith("answer_"))
 async def handle_answer(callback: types.CallbackQuery, state: FSMContext):
     parts = callback.data.split("_")
@@ -104,7 +103,6 @@ async def handle_answer(callback: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     correct_count = data.get("correct", 0)
 
-    # ✅ To‘g‘ri javobni tekshirish
     if user_answer == correct_index:
         correct_count += 1
         await callback.message.answer("✅ <b>To‘g‘ri javob!</b>", parse_mode="HTML")
@@ -114,13 +112,5 @@ async def handle_answer(callback: types.CallbackQuery, state: FSMContext):
             parse_mode="HTML"
         )
 
-    # ✅ Keyingi savolga o‘tish taymeri
-    msg = await callback.message.answer("⏳ <b>Keyingi savol 5 soniyadan keyin chiqadi...</b>", parse_mode="HTML")
-    await state.update_data(index=q_index + 1, correct=correct_count)
-
-    for i in range(5, 0, -1):
-        await msg.edit_text(f"⏳ <b>{i} soniya qoldi...</b>", parse_mode="HTML")
-        await asyncio.sleep(1)
-
+    await state.update_data(correct=correct_count)
     await callback.answer()
-    await send_question(callback.message, state)
