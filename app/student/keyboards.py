@@ -22,7 +22,7 @@ student_basic_reply_keyboard = ReplyKeyboardMarkup(
         ],
         [
             KeyboardButton(text="🚪 Chiqish"),
-            [KeyboardButton(text="📝 Testni boshlash")],
+            KeyboardButton(text="📝 Testni boshlash")
 
         ]
     ],
@@ -44,7 +44,7 @@ student_basic_reply_keyboard_for_parent = ReplyKeyboardMarkup(
             KeyboardButton(text="📊 Baholar")
         ],
         [
-            [KeyboardButton(text="📝 Testni boshlash")],
+            KeyboardButton(text="📝 Testni boshlash"),
             KeyboardButton(text="⬅️ Ortga qaytish"),
 
         ]
@@ -63,6 +63,15 @@ student_basic_reply_keyboard_test_type = ReplyKeyboardMarkup(
     resize_keyboard=True,
     input_field_placeholder="👆 Birini tanlang!"
 )
+
+
+def test_start_keyboard():
+    return ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📝 Testni boshlash")],
+        ],
+        resize_keyboard=True
+    )
 
 
 def create_months_inline_keyboard(data, selected_year=None):

@@ -8,7 +8,6 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-
 @celery.task(name='app.tasks.process_login_task')
 def process_login_task(telegram_id, username, password):
     logger.info('taskdan oldin')

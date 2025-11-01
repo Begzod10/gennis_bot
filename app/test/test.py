@@ -1,7 +1,8 @@
-from aiogram import Router, F
+from aiogram import Router, F, types
 from aiogram.types import Message, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 test = Router()
 
@@ -10,6 +11,7 @@ class TestStates(StatesGroup):
     waiting_for_answer = State()
 
 
+# ✅ Test savollari ro‘yxati
 html_savoli = [
     {
         "q": "HTML5’da <section> va <div> teglari orasidagi farq nimada?",
@@ -29,123 +31,10 @@ html_savoli = [
         ],
         "answer": "Rasm va grafik chizish uchun"
     },
-    {
-        "q": "HTML’da accessibility (foydalanuvchilar uchun qulaylik) ni yaxshilash uchun qaysi atribut ishlatiladi?",
-        "options": ["aria-label", "alt-text", "screen-reader"],
-        "answer": "aria-label"
-    },
-    {
-        "q": "<meta charset='UTF-8'> tegi nima qiladi?",
-        "options": [
-            "Brauzerga sahifa kengligini belgilaydi",
-            "Tegishli script faylini ulaydi",
-            "Veb sahifa kodlash turini belgilaydi"
-        ],
-        "answer": "Veb sahifa kodlash turini belgilaydi"
-    },
-    {
-        "q": "<picture> tegi nimaga xizmat qiladi?",
-        "options": [
-            "Turli ekran o‘lchamlariga mos rasm tanlash uchun",
-            "Rasmlarni guruhlash uchun",
-            "Rasm ustiga matn yozish uchun"
-        ],
-        "answer": "Turli ekran o‘lchamlariga mos rasm tanlash uchun"
-    },
-    {
-        "q": "HTML’da <source> tegi qayerda ishlatiladi?",
-        "options": [
-            "<audio> va <video> ichida",
-            "<form> ichida",
-            "<img> ichida"
-        ],
-        "answer": "<audio> va <video> ichida"
-    },
-    {
-        "q": "HTML’da <noscript> tegi nima qiladi?",
-        "options": [
-            "Skriptni o‘chiradi",
-            "JavaScript o‘chirib qo‘yilgan foydalanuvchilarga matn ko‘rsatadi",
-            "Serverdagi kodni yashiradi"
-        ],
-        "answer": "JavaScript o‘chirib qo‘yilgan foydalanuvchilarga matn ko‘rsatadi"
-    },
-    {
-        "q": "<data> tegi nimani bildiradi?",
-        "options": [
-            "Jadvallarni yaratadi",
-            "Script kodini o‘rnatadi",
-            "Ma’lumot qiymatini mashina tomonidan o‘qiladigan shaklda saqlaydi"
-        ],
-        "answer": "Ma’lumot qiymatini mashina tomonidan o‘qiladigan shaklda saqlaydi"
-    },
-    {
-        "q": "<b> va <strong> teglari orasidagi farq nimada?",
-        "options": [
-            "<b> faqat vizual, <strong> esa semantik urg‘u beradi",
-            "Ikkalasi ham bir xil",
-            "<strong> matnni kichik qiladi"
-        ],
-        "answer": "<b> faqat vizual, <strong> esa semantik urg‘u beradi"
-    },
-    {
-        "q": "<link rel='preload'> nima uchun ishlatiladi?",
-        "options": [
-
-            "Sahifadagi linklarni optimallashtirish uchun",
-            "External CSS ulash uchun",
-            "Muayyan resursni oldindan yuklash uchun"
-        ],
-        "answer": "Muayyan resursni oldindan yuklash uchun"
-    },
-    {
-        "q": "<abbr> tegi nimani bildiradi?",
-        "options": [
-            "Qisqartma so‘z yoki iborani belgilaydi",
-            "Matnga izoh qo‘shadi",
-            "Paragraf yaratadi"
-        ],
-        "answer": "Qisqartma so‘z yoki iborani belgilaydi"
-    },
-    {
-        "q": "HTML’da <template> tegi nima uchun ishlatiladi?",
-        "options": [
-            "JavaScript yordamida dinamik kiritiladigan tarkibni saqlash uchun",
-            "Faylni import qilish uchun",
-            "Server bilan aloqani o‘rnatish uchun"
-        ],
-        "answer": "JavaScript yordamida dinamik kiritiladigan tarkibni saqlash uchun"
-    },
-    {
-        "q": "HTML’da <iframe> tegi xavfsizlik nuqtayi nazaridan qanday xavf tug‘dirishi mumkin?",
-        "options": [
-            "Uchinchi tomon sahifalari orqali XSS yoki phishing hujumlariga yo‘l ochadi",
-            "Brauzerni sekinlashtiradi, xolos",
-            "HTML faylini buzadi"
-        ],
-        "answer": "Uchinchi tomon sahifalari orqali XSS yoki phishing hujumlariga yo‘l ochadi"
-    },
-    {
-        "q": "HTML5’da ‘contenteditable’ atributi nima qiladi?",
-        "options": [
-            "Elementni foydalanuvchi tomonidan tahrir qilinadigan holga keltiradi",
-            "Matnni faqat o‘qish rejimiga o‘tkazadi",
-            "HTML kodini avtomatik tuzatadi"
-        ],
-        "answer": "Elementni foydalanuvchi tomonidan tahrir qilinadigan holga keltiradi"
-    },
-    {
-        "q": "<time datetime='2025-10-14'>14-oktabr 2025</time> tegi nima maqsadda ishlatiladi?",
-        "options": [
-            "Sana yoki vaqtni semantik tarzda ifodalash uchun",
-            "Brauzer vaqt zonasini o‘zgartirish uchun",
-            "Taymer yaratish uchun"
-        ],
-        "answer": "Sana yoki vaqtni semantik tarzda ifodalash uchun"
-    },
 ]
 
 
+# 🔹 Testni boshlash tugmasi
 def test_start_keyboard():
     return ReplyKeyboardMarkup(
         keyboard=[
@@ -155,24 +44,86 @@ def test_start_keyboard():
     )
 
 
-@test.message(F.text == "📝 Testni boshlash")
-async def start_test(message: Message, state: FSMContext):
-    await state.set_state(TestStates.waiting_for_answer)
+# 🔹 Testlar ro‘yxatini chiqaruvchi funksiya (chaqiriladi ham, dekorator bilan ham ishlaydi)
+async def start_test_handler_func(message: types.Message):
+    tests = [
+        {"id": 1, "name": "HTML"},
+        {"id": 2, "name": "CSS"},
+        {"id": 3, "name": "JavaScript"},
+        {"id": 4, "name": "Python"},
+        {"id": 5, "name": "Ingliz tili"},
+        {"id": 6, "name": "Kimyo"},
+    ]
+
+    builder = InlineKeyboardBuilder()
+    for test in tests:
+        builder.button(
+            text=test["name"],
+            callback_data=f"select_test_{test['id']}"
+        )
+    builder.adjust(2)
+
     await message.answer(
-        f"Test boshlandi!\n\n❓ Savol: {html_savoli['question']}\n\n"
-        f"Javobingizni yozing:"
+        "🧠 Quyidagi testlardan birini tanlang:",
+        reply_markup=builder.as_markup()
     )
 
 
-@test.message(TestStates.waiting_for_answer)
-async def check_answer(message: Message, state: FSMContext):
-    user_answer = message.text.lower().strip()
-    correct_answer = html_savoli["answer"]
+# 🔹 Ushbu funksiya “📝 Testni boshlash” bosilganda avtomatik ishlaydi
+@test.message(F.text == "📝 Testni boshlash")
+async def start_test_handler(message: types.Message):
+    await start_test_handler_func(message)
+
+
+# 🔹 Test tanlanganda
+@test.callback_query(F.data.startswith("select_test_"))
+async def handle_selected_test(callback: types.CallbackQuery, state: FSMContext):
+    test_id = int(callback.data.split("_")[-1])
+
+    tests = {
+        1: "HTML",
+        2: "CSS",
+        3: "JavaScript",
+        4: "Python",
+        5: "Ingliz tili",
+        6: "Kimyo"
+    }
+
+    test_name = tests.get(test_id, "Noma’lum test")
+
+    # Hozircha HTML testini ishlatamiz
+    if test_id == 1:
+        question = html_savoli[0]["q"]
+        options = html_savoli[0]["options"]
+
+        builder = InlineKeyboardBuilder()
+        for opt in options:
+            builder.button(text=opt, callback_data=f"answer_{opt}")
+
+        await callback.message.answer(
+            f"✅ Siz <b>{test_name}</b> testini tanladingiz!\n\n"
+            f"❓ <b>{question}</b>",
+            parse_mode="HTML",
+            reply_markup=builder.as_markup()
+        )
+
+        await state.set_state(TestStates.waiting_for_answer)
+        await callback.answer()
+    else:
+        await callback.message.answer(f"❌ {test_name} testi hali tayyor emas.")
+        await callback.answer()
+
+
+# 🔹 Foydalanuvchi javobni yuborganda
+@test.callback_query(F.data.startswith("answer_"))
+async def check_answer(callback: types.CallbackQuery, state: FSMContext):
+    user_answer = callback.data.replace("answer_", "").strip()
+    correct_answer = html_savoli[0]["answer"]
 
     if user_answer == correct_answer:
-        await message.answer("✅ Togri javob", reply_markup=test_start_keyboard())
+        await callback.message.answer("✅ To‘g‘ri javob!", reply_markup=test_start_keyboard())
     else:
-        await message.answer(f"❌ Notogri", parse_mode="HTML",
-                             reply_markup=test_start_keyboard())
+        await callback.message.answer("❌ Noto‘g‘ri javob!", reply_markup=test_start_keyboard())
 
     await state.clear()
+    await callback.answer()
