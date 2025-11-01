@@ -10,13 +10,13 @@ TEST_VARIANTS = ["Kimyo", "Ingliz tili", "HTML/CSS", "JavaScript", "Python", "Bi
 
 # === HTML/CSS TEST SAVOLLARI ===
 HTML_TEST = [
-    {"q": "1️⃣ HTML5’da <section> va <div> teglari orasidagi farq nimada?",
+    {"q": "1️⃣ HTML5’da &lt;section&gt; va &lt;div&gt; teglari orasidagi farq nimada?",
      "options": ["Ikkalasi ham bir xil ishlaydi",
-                 "<section> semantik teg, <div> esa semantik emas",
-                 "<div> faqat matn uchun ishlatiladi",
+                 "&lt;section&gt; semantik teg, &lt;div&gt; esa semantik emas",
+                 "&lt;div&gt; faqat matn uchun ishlatiladi",
                  "Ikkalasi ham table ichida ishlaydi"],
      "answer": 1},
-    {"q": "2️⃣ <canvas> tegi nima uchun ishlatiladi?",
+    {"q": "2️⃣ &lt;canvas&gt; tegi nima uchun ishlatiladi?",
      "options": ["Video joylash uchun",
                  "Matn formatlash uchun",
                  "Rasm va grafik chizish uchun",
@@ -25,19 +25,20 @@ HTML_TEST = [
     {"q": "3️⃣ HTML’da accessibility uchun qaysi atribut ishlatiladi?",
      "options": ["aria-label", "alt-text", "screen-reader", "access-attr"],
      "answer": 0},
-    {"q": "4️⃣ <meta charset='UTF-8'> tegi nima qiladi?",
+    {"q": "4️⃣ &lt;meta charset='UTF-8'&gt; tegi nima qiladi?",
      "options": ["Brauzerga sahifa kengligini belgilaydi",
                  "Tegishli script faylini ulaydi",
                  "Veb sahifa kodlash turini belgilaydi",
                  "Sahifa yuklanish vaqtini belgilaydi"],
      "answer": 2},
-    {"q": "5️⃣ <picture> tegi nimaga xizmat qiladi?",
+    {"q": "5️⃣ &lt;picture&gt; tegi nimaga xizmat qiladi?",
      "options": ["Turli ekran o‘lchamlariga mos rasm tanlash uchun",
                  "Rasmlarni guruhlash uchun",
                  "Rasm ustiga matn yozish uchun",
                  "Videoni o‘rnatish uchun"],
      "answer": 0},
 ]
+
 
 # === FAOL SAVOLLARNI SAQLASH ===
 active_questions = {}
@@ -58,6 +59,12 @@ async def start_test_handler(message: types.Message, state: FSMContext):
 async def choose_variant(callback: types.CallbackQuery, state: FSMContext):
     variant = callback.data.split("_")[1]
     await callback.message.answer(f"📝 {variant} testi boshlanmoqda!")
+
+    if variant != "HTML/CSS":
+        await callback.message.answer(f"{variant} testi hozircha tayyor emas.")
+        await callback.answer()
+        return
+
     await state.update_data(index=0, correct=0, test_type=variant)
     await callback.answer()
     await send_question(callback.message, state)
@@ -68,12 +75,8 @@ async def send_question(message: types.Message, state: FSMContext):
     index = data.get("index", 0)
     test_type = data.get("test_type", "HTML/CSS")
 
-    # HTML/CSS testini tanladik
-    if test_type == "HTML/CSS":
-        questions = HTML_TEST
-    else:
-        await message.answer(f"{test_type} testi hozircha tayyor emas.")
-        return
+    # Faqat HTML/CSS testini ishlatamiz
+    questions = HTML_TEST
 
     if index >= len(questions):
         correct = data.get("correct", 0)
@@ -116,16 +119,7 @@ async def handle_answer(callback: types.CallbackQuery, state: FSMContext):
     user_answer = int(parts[2])
 
     data = await state.get_data()
-    test_type = data.get("test_type", "HTML/CSS")
-
-    # Test savollarini tanlash
-    if test_type == "HTML/CSS":
-        questions = HTML_TEST
-    else:
-        await callback.message.answer(f"{test_type} testi hozircha tayyor emas.")
-        await callback.answer()
-        return
-
+    questions = HTML_TEST
     q = questions[q_index]
     correct_index = q["answer"]
     correct_count = data.get("correct", 0)
