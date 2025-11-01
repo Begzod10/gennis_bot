@@ -58,6 +58,12 @@ async def start_test_handler(message: types.Message, state: FSMContext):
 async def choose_variant(callback: types.CallbackQuery, state: FSMContext):
     variant = callback.data.split("_")[1]
     await callback.message.answer(f"📝 {variant} testi boshlanmoqda!")
+
+    if variant != "HTML/CSS":
+        await callback.message.answer(f"{variant} testi hozircha tayyor emas.")
+        await callback.answer()
+        return
+
     await state.update_data(index=0, correct=0, test_type=variant)
     await callback.answer()
     await send_question(callback.message, state)
@@ -68,12 +74,8 @@ async def send_question(message: types.Message, state: FSMContext):
     index = data.get("index", 0)
     test_type = data.get("test_type", "HTML/CSS")
 
-    # HTML/CSS testini tanladik
-    if test_type == "HTML/CSS":
-        questions = HTML_TEST
-    else:
-        await message.answer(f"{test_type} testi hozircha tayyor emas.")
-        return
+    # Faqat HTML/CSS testini ishlatamiz
+    questions = HTML_TEST
 
     if index >= len(questions):
         correct = data.get("correct", 0)
@@ -116,16 +118,7 @@ async def handle_answer(callback: types.CallbackQuery, state: FSMContext):
     user_answer = int(parts[2])
 
     data = await state.get_data()
-    test_type = data.get("test_type", "HTML/CSS")
-
-    # Test savollarini tanlash
-    if test_type == "HTML/CSS":
-        questions = HTML_TEST
-    else:
-        await callback.message.answer(f"{test_type} testi hozircha tayyor emas.")
-        await callback.answer()
-        return
-
+    questions = HTML_TEST
     q = questions[q_index]
     correct_index = q["answer"]
     correct_count = data.get("correct", 0)
