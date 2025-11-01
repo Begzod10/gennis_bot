@@ -11,7 +11,7 @@ from aiogram import Router
 from aiogram.filters import StateFilter
 from app.states import MenuStates
 from .utils import get_student
-from app.test import test
+from app.test.test import start_test_handler
 
 student_router = Router()
 years_data = {}
@@ -268,5 +268,5 @@ async def handle_month_selection(callback: types.CallbackQuery, state: FSMContex
 
 
 @student_router.message(F.text == "📝 Testni boshlash")
-async def start_student_test(message: Message):
-    await test(message)
+async def student_start_test(message: Message, state):
+    await start_test_handler(message, state)
