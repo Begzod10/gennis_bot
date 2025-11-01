@@ -1,9 +1,13 @@
+
 from aiogram import Router, types, F
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 import asyncio
+from app.db import async_session
+from app.models import TestResult
 
 test = Router()
+
 
 TEST_VARIANTS = ["Kimyo", "Ingliz tili", "HTML/CSS", "JavaScript", "Python", "Biologiya"]
 
@@ -37,20 +41,22 @@ HTML_TEST = [
      "answer": 0},
 ]
 
+
 active_questions = {}
 
+TEST_VARIANTS = ["Kimyo", "Ingliz tili", "HTML/CSS", "JavaScript", "Python", "Biologiya"]
 
+# =================== START ====================
 @test.message(F.text == "📝 Testni boshlash")
 async def start_test_handler(message: types.Message, state: FSMContext):
     builder = InlineKeyboardBuilder()
     for variant in TEST_VARIANTS:
         builder.button(text=variant, callback_data=f"variant_{variant}")
     builder.adjust(2)
-
-    await message.answer("Qaysi testni tanlaysiz?", reply_markup=builder.as_markup())
+    await message.answer("🧠 Qaysi testni tanlaysiz?", reply_markup=builder.as_markup())
     await state.clear()
 
-
+# =================== VARIANT TANLASH ====================
 @test.callback_query(F.data.startswith("variant_"))
 async def choose_variant(callback: types.CallbackQuery, state: FSMContext):
     variant = callback.data.split("_")[1]
@@ -61,22 +67,39 @@ async def choose_variant(callback: types.CallbackQuery, state: FSMContext):
         await callback.answer()
         return
 
-    await state.update_data(index=0, correct=0, test_type=variant)
+    await state.update_data(index=0, correct=0, answers={}, test_type=variant, user_id=callback.from_user.id)
     await callback.answer()
     await send_question(callback.message, state)
 
-
+# =================== SAVOL CHIQARISH ====================
 async def send_question(message: types.Message, state: FSMContext):
     data = await state.get_data()
     index = data.get("index", 0)
     correct = data.get("correct", 0)
+    answers = data.get("answers", {})
     test_type = data.get("test_type", "HTML/CSS")
+    user_id = data.get("user_id")
     questions = HTML_TEST
 
     if index >= len(questions):
         total = len(questions)
         percent = (correct / total) * 100
-        # await message.answer(f"🎉 Test tugadi!\n\n🏁 Sizning natijangiz: {correct}/{total} ({percent:.1f}%)")
+        await message.answer(f"🎉 Test tugadi!\n\n🏁 Sizning natijangiz: {correct}/{total} ({percent:.1f}%)")
+
+        # DB ga saqlash
+        async with async_session() as session:
+            result = TestResult(
+                user_id=user_id,
+                student_id=None,
+                test_type=test_type,
+                total_questions=total,
+                correct_answers=correct,
+                percent=percent,
+                answers=answers
+            )
+            session.add(result)
+            await session.commit()
+
         await state.clear()
         return
 
@@ -87,7 +110,7 @@ async def send_question(message: types.Message, state: FSMContext):
     builder.adjust(1)
 
     msg = await message.answer(
-        f"<b>{q['q']}</b>\n⏳ <b>10 soniya qoldi</b>",
+        f"🧩 <b>{q['q']}</b>\n⏳ <b>10 soniya qoldi</b>",
         parse_mode="HTML",
         reply_markup=builder.as_markup()
     )
@@ -97,12 +120,13 @@ async def send_question(message: types.Message, state: FSMContext):
             try:
                 await asyncio.sleep(1)
                 await msg.edit_text(
-                    f"<b>{q['q']}</b>\n⏳ <b>{sec} soniya qoldi</b>",
+                    f"🧩 <b>{q['q']}</b>\n⏳ <b>{sec} soniya qoldi</b>",
                     parse_mode="HTML",
                     reply_markup=builder.as_markup()
                 )
             except Exception:
                 return
+        # Timeout tugadi, avtomatik keyingi savol
         data = await state.get_data()
         if data.get("index", 0) == index:
             await state.update_data(index=index + 1)
@@ -111,7 +135,7 @@ async def send_question(message: types.Message, state: FSMContext):
     task = asyncio.create_task(countdown())
     active_questions[msg.message_id] = task
 
-
+# =================== JAVOB QABUL QILISH ====================
 @test.callback_query(F.data.startswith("answer_"))
 async def handle_answer(callback: types.CallbackQuery, state: FSMContext):
     task = active_questions.pop(callback.message.message_id, None)
@@ -123,9 +147,15 @@ async def handle_answer(callback: types.CallbackQuery, state: FSMContext):
     user_answer = int(parts[2])
     data = await state.get_data()
     correct = data.get("correct", 0)
+    answers = data.get("answers", {})
+    test_type = data.get("test_type", "HTML/CSS")
+    user_id = data.get("user_id")
     questions = HTML_TEST
     q = questions[q_index]
     correct_index = q["answer"]
+
+    answers[str(q_index)] = user_answer
+    await state.update_data(answers=answers)
 
     if user_answer == correct_index:
         correct += 1
