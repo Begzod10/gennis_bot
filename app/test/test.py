@@ -1,102 +1,83 @@
 import os
 import asyncio
-import requests
+import httpx
 from aiogram import Router, types, F
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 
 test = Router()
 
-# --- Token va URL'lar ---
-TOKEN = os.getenv("GENNIS_TOKEN", "YOUR_GENNIS_TOKEN_HERE")
+GENNIS_TOKEN = os.getenv("GENNIS_TOKEN")  # .env fayldan olingan
 TEST_LIST_URL = "https://classroom.gennis.uz/api/pisa/student/get/list"
 TEST_QUESTIONS_URL = "https://classroom.gennis.uz/api/pisa/student/get"
 TEST_FINISH_URL = "https://classroom.gennis.uz/api/pisa/student/finish"
 
-headers = {
-    "Authorization": f"Bearer {TOKEN}",
-    "Accept": "application/json",
-    "User-Agent": "MyScript/1.0"
-}
-
 active_questions = {}
 
+HEADERS = lambda token: {
+    "Authorization": f"Bearer {token}",
+    "Accept": "application/json",
+    "User-Agent": "GennisBot/1.0"
+}
 
 # --- GET TEST LIST ---
-def get_tests():
-    try:
-        response = requests.get(TEST_LIST_URL, headers=headers)
-        print("Status code:", response.status_code)
-        print("Response text:", response.text)  # Bu juda muhim!
-        if response.status_code != 200:
-            return []
-        data = response.json()
-        return [{"id": t["id"], "name": t["name"]} for t in data if "id" in t and "name" in t]
-    except Exception as e:
-        print("❌ Testlarni olishda xato:", e)
+async def get_tests():
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.get(TEST_LIST_URL, headers=HEADERS(GENNIS_TOKEN))
+    if resp.status_code != 200:
+        print("❌ Test list olishda xato:", resp.status_code, resp.text)
         return []
+    data = resp.json()
+    return [{"id": t["id"], "name": t["name"]} for t in data if "id" in t and "name" in t]
 
 # --- GET QUESTIONS ---
-def get_test_questions(test_id: int):
-    try:
-        url = f"{TEST_QUESTIONS_URL}/{test_id}"
-        resp = requests.get(url, headers=headers)
-        if resp.status_code != 200:
-            print("❌ Savollarni olish xato:", resp.status_code, resp.text)
-            return []
-        data = resp.json()
-        return data.get("questions", [])
-    except Exception as e:
-        print("❌ Savollarni olishda xato:", e)
+async def get_test_questions(test_id: int):
+    url = f"{TEST_QUESTIONS_URL}/{test_id}"
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.get(url, headers=HEADERS(GENNIS_TOKEN))
+    if resp.status_code != 200:
+        print("❌ Savollarni olishda xato:", resp.status_code, resp.text)
         return []
+    data = resp.json()
+    return data.get("questions", [])
 
+# --- FINISH TEST ---
+async def mark_test_finished(test_id: int):
+    url = f"{TEST_FINISH_URL}/{test_id}"
+    async with httpx.AsyncClient(timeout=20) as client:
+        resp = await client.post(url, headers=HEADERS(GENNIS_TOKEN))
+    if resp.status_code == 200:
+        print(f"✅ Test {test_id} tugatildi")
+        return True
+    print(f"❌ Testni yakunlashda xato: {resp.status_code} {resp.text}")
+    return False
 
-# --- MARK TEST FINISHED ---
-def mark_test_finished(test_id: int):
-    try:
-        url = f"{TEST_FINISH_URL}/{test_id}"
-        r = requests.post(url, headers=headers)
-        if r.status_code == 200:
-            print(f"✅ Test {test_id} tugatildi")
-            return True
-        print(f"❌ Yakunlashda xato: {r.status_code} {r.text}")
-        return False
-    except Exception as e:
-        print("❌ Testni yakunlash xato:", e)
-        return False
-
-
-# --- START TEST ---
+# --- START TEST HANDLER ---
 @test.message(F.text == "📝 Testni boshlash")
 async def start_test_handler(message: types.Message, state: FSMContext):
-    tests = get_tests()
+    tests = await get_tests()
     if not tests:
         return await message.answer("❌ Testlar topilmadi!")
-
     builder = InlineKeyboardBuilder()
     for t in tests:
         builder.button(text=t["name"], callback_data=f"variant_{t['id']}")
     builder.adjust(1)
-
     await message.answer("🧠 Qaysi testni tanlaysiz?", reply_markup=builder.as_markup())
     await state.clear()
-
 
 # --- CHOOSE VARIANT ---
 @test.callback_query(F.data.startswith("variant_"))
 async def choose_variant(callback: types.CallbackQuery, state: FSMContext):
     test_id = int(callback.data.split("_")[1])
-    questions = get_test_questions(test_id)
+    questions = await get_test_questions(test_id)
     if not questions:
         await callback.message.answer("❌ Bu testda savollar yo‘q!")
         await callback.answer()
         return
-
     await state.update_data(index=0, correct=0, test_id=test_id, questions=questions)
     await callback.message.answer("✅ Test boshlandi!")
     await callback.answer()
     await send_question(callback.message, state)
-
 
 # --- SEND QUESTION ---
 async def send_question(message: types.Message, state: FSMContext):
@@ -109,7 +90,7 @@ async def send_question(message: types.Message, state: FSMContext):
         total = len(questions)
         percent = (correct / total) * 100
         await message.answer(f"🎉 Test tugadi!\n🏁 Natija: {correct}/{total} ({percent:.1f}%)")
-        mark_test_finished(data["test_id"])
+        await mark_test_finished(data["test_id"])
         await state.clear()
         return
 
@@ -146,7 +127,6 @@ async def send_question(message: types.Message, state: FSMContext):
 
     task = asyncio.create_task(countdown())
     active_questions[msg.message_id] = task
-
 
 # --- HANDLE ANSWER ---
 @test.callback_query(F.data.startswith("answer_"))
