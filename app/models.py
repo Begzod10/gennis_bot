@@ -7,6 +7,7 @@ from sqlalchemy import Table, Column, ForeignKey, BigInteger
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from typing import Optional
 from sqlalchemy.ext.declarative import declarative_base
+from flask_jwt_extended import create_access_token
 
 
 class User(Base):
