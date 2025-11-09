@@ -1,10 +1,8 @@
-# run.py
 import asyncio
 import logging
 import os
 import datetime
 import jwt
-from typing import Optional
 
 from dotenv import load_dotenv, find_dotenv
 from aiogram import Bot, Dispatcher, types
@@ -24,11 +22,11 @@ dotenv_path = find_dotenv(filename=".env")
 load_dotenv(dotenv_path)
 
 TOKEN = os.getenv("TOKEN")
+GENNIS_TOKEN = os.getenv("GENNIS_TOKEN")
 SECRET_KEY = os.getenv("JWT_SECRET", "supersecretkey")
 TOKEN_EXPIRE_HOURS = 1
 
 logging.basicConfig(level=logging.INFO)
-
 
 def create_token(user_id: int) -> str:
     payload = {
@@ -38,8 +36,7 @@ def create_token(user_id: int) -> str:
     token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
     return token
 
-
-def verify_token(token: str) -> Optional[int]:
+def verify_token(token: str):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
         return payload["user_id"]
@@ -48,12 +45,11 @@ def verify_token(token: str) -> Optional[int]:
     except jwt.InvalidTokenError:
         return None
 
-
 async def main():
     bot = Bot(token=TOKEN)
 
     redis_pool = redis.from_url(
-        f"redis://{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', '6379')}/{os.getenv('REDIS_DB_BOT', '2')}"
+        f"redis://{os.getenv('REDIS_HOST','localhost')}:{os.getenv('REDIS_PORT','6379')}/{os.getenv('REDIS_DB_BOT','2')}"
     )
     storage = RedisStorage(redis=redis_pool)
     dp = Dispatcher(storage=storage)
@@ -87,7 +83,6 @@ async def main():
 
     logging.info("Bot starting...")
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     try:

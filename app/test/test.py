@@ -6,53 +6,43 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.fsm.context import FSMContext
 
 test = Router()
-
-GENNIS_TOKEN = os.getenv("GENNIS_TOKEN")  # .env fayldan olingan
+GENNIS_TOKEN = os.getenv("GENNIS_TOKEN")
 TEST_LIST_URL = "https://classroom.gennis.uz/api/pisa/student/get/list"
 TEST_QUESTIONS_URL = "https://classroom.gennis.uz/api/pisa/student/get"
 TEST_FINISH_URL = "https://classroom.gennis.uz/api/pisa/student/finish"
 
 active_questions = {}
-
 HEADERS = lambda token: {
     "Authorization": f"Bearer {token}",
     "Accept": "application/json",
     "User-Agent": "GennisBot/1.0"
 }
 
-# --- GET TEST LIST ---
 async def get_tests():
     async with httpx.AsyncClient(timeout=20) as client:
         resp = await client.get(TEST_LIST_URL, headers=HEADERS(GENNIS_TOKEN))
+    print("Status code:", resp.status_code)
+    print("Response:", resp.text)
     if resp.status_code != 200:
-        print("❌ Test list olishda xato:", resp.status_code, resp.text)
         return []
     data = resp.json()
     return [{"id": t["id"], "name": t["name"]} for t in data if "id" in t and "name" in t]
 
-# --- GET QUESTIONS ---
 async def get_test_questions(test_id: int):
     url = f"{TEST_QUESTIONS_URL}/{test_id}"
     async with httpx.AsyncClient(timeout=20) as client:
         resp = await client.get(url, headers=HEADERS(GENNIS_TOKEN))
     if resp.status_code != 200:
-        print("❌ Savollarni olishda xato:", resp.status_code, resp.text)
         return []
     data = resp.json()
     return data.get("questions", [])
 
-# --- FINISH TEST ---
 async def mark_test_finished(test_id: int):
     url = f"{TEST_FINISH_URL}/{test_id}"
     async with httpx.AsyncClient(timeout=20) as client:
         resp = await client.post(url, headers=HEADERS(GENNIS_TOKEN))
-    if resp.status_code == 200:
-        print(f"✅ Test {test_id} tugatildi")
-        return True
-    print(f"❌ Testni yakunlashda xato: {resp.status_code} {resp.text}")
-    return False
+    return resp.status_code == 200
 
-# --- START TEST HANDLER ---
 @test.message(F.text == "📝 Testni boshlash")
 async def start_test_handler(message: types.Message, state: FSMContext):
     tests = await get_tests()
@@ -65,7 +55,6 @@ async def start_test_handler(message: types.Message, state: FSMContext):
     await message.answer("🧠 Qaysi testni tanlaysiz?", reply_markup=builder.as_markup())
     await state.clear()
 
-# --- CHOOSE VARIANT ---
 @test.callback_query(F.data.startswith("variant_"))
 async def choose_variant(callback: types.CallbackQuery, state: FSMContext):
     test_id = int(callback.data.split("_")[1])
@@ -79,7 +68,6 @@ async def choose_variant(callback: types.CallbackQuery, state: FSMContext):
     await callback.answer()
     await send_question(callback.message, state)
 
-# --- SEND QUESTION ---
 async def send_question(message: types.Message, state: FSMContext):
     data = await state.get_data()
     index = data.get("index", 0)
@@ -97,7 +85,6 @@ async def send_question(message: types.Message, state: FSMContext):
     q = questions[index]
     text = q.get("q", "")
     options = q.get("options", [])
-
     builder = InlineKeyboardBuilder()
     for i, opt in enumerate(options):
         builder.button(text=opt, callback_data=f"answer_{index}_{i}")
@@ -128,7 +115,6 @@ async def send_question(message: types.Message, state: FSMContext):
     task = asyncio.create_task(countdown())
     active_questions[msg.message_id] = task
 
-# --- HANDLE ANSWER ---
 @test.callback_query(F.data.startswith("answer_"))
 async def handle_answer(callback: types.CallbackQuery, state: FSMContext):
     task = active_questions.pop(callback.message.message_id, None)
@@ -138,11 +124,9 @@ async def handle_answer(callback: types.CallbackQuery, state: FSMContext):
     _, q_index, user_answer = callback.data.split("_")
     q_index = int(q_index)
     user_answer = int(user_answer)
-
     data = await state.get_data()
     questions = data.get("questions", [])
     correct = data.get("correct", 0)
-
     correct_index = questions[q_index].get("answer", -1)
 
     if user_answer == correct_index:
