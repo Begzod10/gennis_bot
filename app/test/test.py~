@@ -26,15 +26,15 @@ active_questions = {}
 def get_tests():
     try:
         response = requests.get(TEST_LIST_URL, headers=headers)
-        print("Status code:", response.status_code)
-        print("Response text:", response.text)  # Bu juda muhim!
         if response.status_code != 200:
+            print("❌ API status:", response.status_code, response.text)
             return []
         data = response.json()
         return [{"id": t["id"], "name": t["name"]} for t in data if "id" in t and "name" in t]
     except Exception as e:
         print("❌ Testlarni olishda xato:", e)
         return []
+
 
 # --- GET QUESTIONS ---
 def get_test_questions(test_id: int):
