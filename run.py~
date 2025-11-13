@@ -4,7 +4,7 @@ import os
 import datetime
 import jwt
 
-from dotenv import load_dotenv, find_dotenv
+from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.fsm.storage.redis import RedisStorage
@@ -15,10 +15,9 @@ from app.student.handlers import student_router
 from app.teacher.handlers import teacher_router
 from app.parent.handlers import parent_router
 from app.user.handlers import user_router
-from app.test.test import test
+from app.test.test import student_routers
 
-dotenv_path = find_dotenv(filename=".env")
-load_dotenv(dotenv_path)
+load_dotenv()
 TOKEN = os.getenv("TOKEN")
 GENNIS_TOKEN = os.getenv("GENNIS_TOKEN")
 SECRET_KEY = os.getenv("JWT_SECRET", "supersecretkey")
@@ -60,7 +59,7 @@ async def main():
     dp.include_router(student_router)
     dp.include_router(teacher_router)
     dp.include_router(parent_router)
-    dp.include_router(test)
+    dp.include_router(student_routers)
 
     @dp.message(Command("login"))
     async def login(message: types.Message):

@@ -15,9 +15,8 @@ from app.student.handlers import student_router
 from app.teacher.handlers import teacher_router
 from app.parent.handlers import parent_router
 from app.user.handlers import user_router
-from app.test.test import test
+from app.student.tests import student_routers
 
-# --- Load environment variables ---
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
 GENNIS_TOKEN = os.getenv("GENNIS_TOKEN")
@@ -26,6 +25,7 @@ TOKEN_EXPIRE_HOURS = 1
 
 logging.basicConfig(level=logging.INFO)
 
+
 def create_token(user_id: int) -> str:
     payload = {
         "user_id": user_id,
@@ -33,6 +33,7 @@ def create_token(user_id: int) -> str:
     }
     token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
     return token
+
 
 def verify_token(token: str):
     try:
@@ -43,11 +44,12 @@ def verify_token(token: str):
     except jwt.InvalidTokenError:
         return None
 
+
 async def main():
     bot = Bot(token=TOKEN)
 
     redis_pool = redis.from_url(
-        f"redis://{os.getenv('REDIS_HOST','localhost')}:{os.getenv('REDIS_PORT','6379')}/{os.getenv('REDIS_DB_BOT','2')}"
+        f"redis://{os.getenv('REDIS_HOST', 'localhost')}:{os.getenv('REDIS_PORT', '6379')}/{os.getenv('REDIS_DB_BOT', '2')}"
     )
     storage = RedisStorage(redis=redis_pool)
     dp = Dispatcher(storage=storage)
@@ -57,7 +59,7 @@ async def main():
     dp.include_router(student_router)
     dp.include_router(teacher_router)
     dp.include_router(parent_router)
-    dp.include_router(test)
+    dp.include_router(student_routers)
 
     @dp.message(Command("login"))
     async def login(message: types.Message):
@@ -81,6 +83,7 @@ async def main():
 
     logging.info("Bot starting...")
     await dp.start_polling(bot)
+
 
 if __name__ == "__main__":
     try:
