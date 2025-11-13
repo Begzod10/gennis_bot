@@ -1,35 +1,31 @@
-#tests
 import os
-import asyncio
 import requests
-from aiogram import Router, types, F
-from aiogram.fsm.context import FSMContext
+from aiogram import types, F, Router
 from aiogram.fsm.state import StatesGroup, State
+from aiogram.fsm.context import FSMContext
 from aiogram.types import KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from .keyboards import student_basic_reply_keyboard_test_type
+
+GENNIS_TOKEN = os.getenv("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc2Mjg1NjY4NCwianRpIjoiYmFhZTczZTAtNmU4Yy00NDU1LWEwYTktNGU4NjYzMzhiNjY5IiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IjhkMDI3NzJjNTE5MzExZjBhNTQ4MzFkODQyNzBhMjIwIiwibmJmIjoxNzYyODU2Njg0LCJjc3JmIjoiZmY2OGFkZDktNGEyOS00OGZiLWFmMzEtMDFjZDliNmE2ZGVhIiwiZXhwIjoxNzYyOTQzMDg0fQ.kyqMRFUS8AcPDqMJ8yLD0duqw0Q0wwiGgGgAkcfdKlc")
+TEST_LIST_URL = "https://classroom.gennis.uz/api/pisa/test/crud/34"
 
 student_routers = Router()
-GENNIS_TOKEN = os.getenv(
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc2Mjg1NjY4NCwianRpIjoiYmFhZTczZTAtNmU4Yy00NDU1LWEwYTktNGU4NjYzMzhiNjY5IiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IjhkMDI3NzJjNTE5MzExZjBhNTQ4MzFkODQyNzBhMjIwIiwibmJmIjoxNzYyODU2Njg0LCJjc3JmIjoiZmY2OGFkZDktNGEyOS00OGZiLWFmMzEtMDFjZDliNmE2ZGVhIiwiZXhwIjoxNzYyOTQzMDg0fQ.kyqMRFUS8AcPDqMJ8yLD0duqw0Q0wwiGgGgAkcfdKlc")
-TEST_LIST_URL = "https://classroom.gennis.uz/api/pisa/test/crud/34"
-active_questions = {}
-HEADERS = lambda token: {
-    "Authorization": f"Bearer {token}",
-    "Accept": "application/json",
-    "User-Agent": "GennisBot/1.0"
-}
 
 
 class TestStates(StatesGroup):
     question_number = State()
     score = State()
     questions = State()
-    waiting_answer = State()
     test_id = State()
     answered_questions = State()
 
 
-def save_result(user_id, username, score, total, percent, answered_questions):
-    print(f"Natija: {user_id}, {username}, {score}/{total} ({percent}%), Savollar: {answered_questions}")
+def HEADERS(token):
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+        "User-Agent": "GennisBot/1.0"
+    }
 
 
 def get_tests():
@@ -43,13 +39,6 @@ def get_tests():
     except Exception as e:
         print(f"Xato test olishda: {e}")
     return []
-
-
-def student_basic_reply_keyboard_test_type():
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="🏁 Onlayn test yechish")], [KeyboardButton(text="⬅️ Orqaga")]],
-        resize_keyboard=True
-    )
 
 
 @student_routers.message(F.text == "🏁 Onlayn test yechish")
@@ -68,8 +57,7 @@ async def show_tests(message: types.Message, state: FSMContext):
 @student_routers.message(F.text == "⬅️ Orqaga")
 async def back_to_menu(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("👆 Iltimos, quyidagilardan birini tanlang:",
-                         reply_markup=student_basic_reply_keyboard_test_type())
+    await message.answer("👆 Iltimos, testni tanlang:", reply_markup=student_basic_reply_keyboard_test_type)
 
 
 @student_routers.message()
@@ -81,6 +69,7 @@ async def select_test(message: types.Message, state: FSMContext):
     selected = next((t for t in tests if t["name"] == message.text), None)
     if not selected:
         return
+
     await message.answer(f"✅ Siz tanladingiz: <b>{selected['name']}</b>", parse_mode="HTML")
     await message.answer("🧠 Test yuklanmoqda...", reply_markup=ReplyKeyboardRemove())
 
@@ -99,7 +88,7 @@ async def select_test(message: types.Message, state: FSMContext):
                             enumerate(options)]
             })
     if not questions:
-        await message.answer("❗️ Bu testda savollar topilmadi.", reply_markup=student_basic_reply_keyboard_test_type())
+        await message.answer("❗️ Bu testda savollar topilmadi.", reply_markup=student_basic_reply_keyboard_test_type)
         return
 
     await state.update_data(question_number=0, score=0, questions=questions, test_id=selected["id"],
@@ -125,6 +114,7 @@ async def send_question(message: types.Message, state: FSMContext):
     buttons = [[KeyboardButton(text=str(i + 1))] for i in range(len(options))]
     buttons.append([KeyboardButton(text="❌ Testdan chiqish")])
     keyboard = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+
     await message.answer(f"{question_text}\n\n" + "\n".join(f"{i + 1}. {opt['text']}" for i, opt in enumerate(options)),
                          reply_markup=keyboard)
 
@@ -132,7 +122,7 @@ async def send_question(message: types.Message, state: FSMContext):
 @student_routers.message(TestStates.question_number, F.text == "❌ Testdan chiqish")
 async def exit_test(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("🚪 Siz testdan chiqdingiz.", reply_markup=student_basic_reply_keyboard_test_type())
+    await message.answer("🚪 Siz testdan chiqdingiz.", reply_markup=student_basic_reply_keyboard_test_type)
 
 
 @student_routers.message(TestStates.question_number, F.text.regexp(r"^\d+$"))
@@ -172,11 +162,12 @@ async def finish_test(message: types.Message, state: FSMContext):
     percent = round((score / total) * 100) if total else 0
     answered_questions = data.get("answered_questions", [])
 
-    save_result(user_id=message.from_user.id, username=message.from_user.username,
-                score=score, total=total, percent=percent, answered_questions=answered_questions)
+    print(
+        f"Natija: {message.from_user.id}, {message.from_user.username}, {score}/{total} ({percent}%), {answered_questions}")
 
     await message.answer(
         f"✅ Test tugadi!\nSiz {score}/{total} to‘g‘ri javob berdingiz.\n📊 Foiz: {percent}%\n📄 Javob bergan savollar:\n" + "\n".join(
             answered_questions),
-        reply_markup=student_basic_reply_keyboard_test_type())
+        reply_markup=student_basic_reply_keyboard_test_type
+    )
     await state.clear()

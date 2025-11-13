@@ -1,4 +1,4 @@
-# handlers.py
+#handlers.py
 from aiogram import F, types
 from aiogram.types import Message
 import requests
@@ -270,6 +270,6 @@ async def handle_month_selection(callback: types.CallbackQuery, state: FSMContex
 
 @student_router.message(F.text == "📝 Testni boshlash")
 async def student_start_test(message: Message, state):
-    await message.answer("🏁 Test bo‘limiga o‘tyapsiz...",
-                         reply_markup=student_basic_reply_keyboard_test_type())
+    await student_routers.student_start_test(message, state)
+
 

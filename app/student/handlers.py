@@ -1,4 +1,4 @@
-# handlers.py
+#handlers.py
 from aiogram import F, types
 from aiogram.types import Message
 import requests
@@ -38,6 +38,7 @@ async def get_payments_list(message: Message):
         await message.answer("⚠️ To'lovlar topilmadi.")
         return
 
+    # Build a table-like message
     text = f"📋 <b>{student.name}, so'nggi to'lovlar ro'yxati:</b>\n\n"
     text += "{:<15} {:<12} {:<10}\n".format("Sana", "Miqdor", "Turi")
     text += "-" * 40 + "\n"
@@ -269,6 +270,6 @@ async def handle_month_selection(callback: types.CallbackQuery, state: FSMContex
 
 @student_router.message(F.text == "📝 Testni boshlash")
 async def student_start_test(message: Message, state):
-    await message.answer("🏁 Test bo‘limiga o‘tyapsiz...",
-                         reply_markup=student_basic_reply_keyboard_test_type())
+    await student_routers(message, state)
+
 
