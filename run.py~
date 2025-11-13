@@ -15,7 +15,7 @@ from app.student.handlers import student_router
 from app.teacher.handlers import teacher_router
 from app.parent.handlers import parent_router
 from app.user.handlers import user_router
-from app.test.test import student_routers
+from app.student.tests import student_routers
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")

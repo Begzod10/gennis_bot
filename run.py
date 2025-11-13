@@ -15,7 +15,7 @@ from app.student.handlers import student_router
 from app.teacher.handlers import teacher_router
 from app.parent.handlers import parent_router
 from app.user.handlers import user_router
-from app.student.tests import student_routers
+# from app.student.tests import student_routers
 
 load_dotenv()
 TOKEN = os.getenv("TOKEN")
@@ -59,7 +59,7 @@ async def main():
     dp.include_router(student_router)
     dp.include_router(teacher_router)
     dp.include_router(parent_router)
-    dp.include_router(student_routers)
+    # dp.include_router(student_routers)
 
     @dp.message(Command("login"))
     async def login(message: types.Message):

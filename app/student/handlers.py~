@@ -1,12 +1,12 @@
-# handlers.py
+# app/student/handlers.py
 import os
 import requests
-from aiogram import F, types, Router
-from aiogram.types import Message, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from dotenv import load_dotenv
+from aiogram import Router, F
+from aiogram.types import Message, CallbackQuery, KeyboardButton, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
-from aiogram.filters.state import StateFilter
-from dotenv import load_dotenv
+
 from .keyboards import (
     create_years_reply_keyboard,
     create_months_inline_keyboard,
@@ -14,25 +14,40 @@ from .keyboards import (
     student_basic_reply_keyboard_test_type
 )
 from .utils import get_student
-from app.student.tests import student_routers
-from app.states import MenuStates
+
+years_data = {}
+dates_info = {}
+selected_student_year = {}
+selected_student_month = {}
+user_mode = {}
+
+load_dotenv()
+API = os.getenv("https://classroom.gennis.uz/api/pisa/test/crud/34")
+GENNIS_TOKEN = os.getenv(
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc2MzAyOTU0NCwianRpIjoiMmFhOTJmNDAtNzc3ZC00ZTMwLTg4NjMtYmRjNmViMzdhN2JhIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IjhkMDI3NzJjNTE5MzExZjBhNTQ4MzFkODQyNzBhMjIwIiwibmJmIjoxNzYzMDI5NTQ0LCJjc3JmIjoiNDcyODg5YzMtNjU5Ni00YWMyLThlMDUtZWI3OTc0ODEzZmIzIiwiZXhwIjoxNzYzMTE1OTQ0fQ.MnJRRmuLN_y3nNf6_gybIsjaa4g8WcJvz56KgULVYAE")
 
 student_router = Router()
-load_dotenv()
+
+
+class MenuStates(StatesGroup):
+    attendances = State()
+    scores = State()
+
+
+class TestStates(StatesGroup):
+    question_number = State()
+    score = State()
+    questions = State()
+    test_id = State()
+    answered_questions = State()
 
 
 @student_router.message(F.text == "💳 To'lovlar ro‘yhati")
 async def get_payments_list(message: Message):
-    api = os.getenv('API')
     telegram_id = message.from_user.id
     student = get_student(telegram_id)
-
-    try:
-        response = requests.get(f'{api}/api/bot/students/payments/{student.platform_id}')
-        payments = response.json().get('payments', [])
-    except Exception as e:
-        await message.answer("❌ To‘lovlar ro‘yhati olinmadi.")
-        return
+    response = requests.get(f'{API}/api/bot/students/payments/{student.platform_id}')
+    payments = response.json().get('payments', [])
 
     if not payments:
         await message.answer("⚠️ To'lovlar topilmadi.")
@@ -41,12 +56,12 @@ async def get_payments_list(message: Message):
     text = f"📋 <b>{student.name}, so'nggi to'lovlar ro'yxati:</b>\n\n"
     text += "{:<15} {:<12} {:<10}\n".format("Sana", "Miqdor", "Turi")
     text += "-" * 40 + "\n"
-
-    for pay in payments[:10]:
-        text += "{:<5} {:<12} {:<10}\n".format(
-            pay['date'], pay['amount'], pay['payment_type']
+    for pay in payments:
+        text += "{:<15} {:<12} {:<10}\n".format(
+            pay['date'],
+            pay['amount'],
+            pay['payment_type']
         )
-
     text += "\n⬆️ Qo'shimcha savollar uchun adminlarimizga murojaat qiling."
     await message.answer(text, parse_mode="HTML")
 
@@ -61,45 +76,28 @@ async def test_types(message: Message):
 
 @student_router.message(F.text == "📄 Offlayn test natijalari")
 async def handle_test_results(message: Message):
-    api = os.getenv('API')
     telegram_id = message.from_user.id
     student = get_student(telegram_id)
-
-    try:
-        response = requests.get(f'{api}/api/bot/students/test/results/{student.platform_id}')
-        data = response.json()
-        test_results = data.get('test_results', [])
-    except Exception as e:
-        await message.answer("❌ Test natijalari olinmadi.")
-        return
+    response = requests.get(f'{API}/api/bot/students/test/results/{student.platform_id}')
+    data = response.json()
+    test_results = data.get('test_results', [])
 
     if not test_results:
         await message.answer("⚠️ Test natijalari topilmadi.")
         return
 
-    text = f"📚 <b>{student.name},  test natijalari:</b>\n\n"
+    text = f"📚 <b>{student.name}, test natijalari:</b>\n\n"
     for group in test_results:
-        group_name = group['name']
-        subject_name = group['subject']
-        teacher = group['teacher']
-        tests = group['tests']
-
-        text += (
-            f"👥 <b>Guruh:</b> {group_name}\n"
-            f"📚 <b>Fan:</b> {subject_name}\n"
-            f"👨‍🏫 <b>O'qituvchi:</b> {teacher}\n"
-        )
-
+        text += f"👥 <b>Guruh:</b> {group['name']}\n📚 <b>Fan:</b> {group['subject']}\n👨‍🏫 <b>O'qituvchi:</b> {group['teacher']}\n"
+        tests = group.get('tests', [])
         if not tests:
             text += "⚠️ Test natijalari yo'q.\n"
         else:
             for result in tests:
                 text += (
                     f"📅 <b>Sana:</b> {result['date']}\n"
-                    f"✅ <b>Natija:</b> {result['percentage']} "
-                    f"({result['true_answers']} ta to'g'ri javob)\n"
-                    f"🎯 <b>Test:</b> {result['test_info']['name']} "
-                    f"(Daraja: {result['test_info']['level']})\n"
+                    f"✅ <b>Natija:</b> {result['percentage']} ({result['true_answers']} ta to'g'ri javob)\n"
+                    f"🎯 <b>Test:</b> {result['test_info']['name']} (Daraja: {result['test_info']['level']})\n"
                 )
                 text += "━" * 20 + "\n"
         text += "═" * 25 + "\n\n"
@@ -109,17 +107,11 @@ async def handle_test_results(message: Message):
 
 @student_router.message(F.text == "🖥️ Onlayn test natijalari")
 async def handle_online_test_results(message: Message):
-    api = os.getenv('API')
     telegram_id = message.from_user.id
     student = get_student(telegram_id)
-
-    try:
-        response = requests.get(f'https://classroom.gennis.uz/api/pisa/student/pisa/results/{student.platform_id}')
-        data = response.json()
-        test_results = data.get('data', [])
-    except Exception as e:
-        await message.answer("❌ Onlayn test natijalari olinmadi.")
-        return
+    response = requests.get(f'https://classroom.gennis.uz/api/pisa/student/pisa/results/{student.platform_id}')
+    data = response.json()
+    test_results = data.get('data', [])
 
     if not test_results:
         await message.answer("⚠️ Onlayn test natijalari topilmadi.")
@@ -143,18 +135,11 @@ async def handle_online_test_results(message: Message):
 
 @student_router.message(F.text == "📝 Davomatlar ro‘yhati")
 async def get_davomatlar_royxati(message: Message, state: FSMContext):
-    api = os.getenv('API')
     await state.set_state(MenuStates.attendances)
     telegram_id = message.from_user.id
     student = get_student(telegram_id)
-
-    try:
-        response = requests.get(f'{api}/api/bot/students/attendance/dates/{student.platform_id}')
-        dates_data = response.json()['data']
-    except Exception as e:
-        await message.answer("❌ Davomatlar olinmadi.")
-        return
-
+    response = requests.get(f'{API}/api/bot/students/attendance/dates/{student.platform_id}')
+    dates_data = response.json()['data']
     await state.update_data(
         mode="attendance",
         years=dates_data['years'],
@@ -168,18 +153,11 @@ async def get_davomatlar_royxati(message: Message, state: FSMContext):
 
 @student_router.message(lambda msg: msg.text and "baholar" in msg.text.lower())
 async def get_baholar(message: Message, state: FSMContext):
-    api = os.getenv('API')
     await state.set_state(MenuStates.scores)
     telegram_id = message.from_user.id
     student = get_student(telegram_id)
-
-    try:
-        response = requests.get(f'{api}/api/bot/students/attendance/dates/{student.platform_id}')
-        dates_data = response.json()['data']
-    except Exception as e:
-        await message.answer("❌ Baholar olinmadi.")
-        return
-
+    response = requests.get(f'{API}/api/bot/students/attendance/dates/{student.platform_id}')
+    dates_data = response.json()['data']
     await state.update_data(
         mode="scores",
         years=dates_data['years'],
@@ -191,67 +169,231 @@ async def get_baholar(message: Message, state: FSMContext):
     await message.answer("✅ Yilni tanlang:", reply_markup=years_keyboard)
 
 
-@student_router.message(StateFilter(MenuStates.attendances, MenuStates.scores))
+@student_router.message(F.text)
 async def handle_dynamic_year_selection(message: Message, state: FSMContext):
     data = await state.get_data()
-    if message.text in data.get("years", []):
-        await state.update_data(selected_year=message.text)
-        months_keyboard = create_months_inline_keyboard(data["dates_info"], message.text)
-        await message.answer(f"✅ Siz {message.text} yilni tanladingiz!")
-        await message.answer("✅ Shu yilning oylarini tanlang:", reply_markup=months_keyboard)
+    if "years" not in data or message.text not in data["years"]:
+        return
+
+    await state.update_data(selected_year=message.text)
+    months_keyboard = create_months_inline_keyboard(data["dates_info"], message.text)
+    await message.answer(f"✅ Siz {message.text} yilni tanladingiz!")
+    await message.answer("✅ Shu yilning oylarini tanlang:", reply_markup=months_keyboard)
 
 
 @student_router.callback_query(lambda c: c.data.startswith("month_"))
-async def handle_month_selection(callback: types.CallbackQuery, state: FSMContext):
-    api = os.getenv("API")
-    telegram_id = callback.from_user.id
-    month = callback.data.split("_")[1]
-
-    await callback.message.answer(f"✅ Siz {month} oyini tanladingiz!")
+async def handle_month_selection(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
+    month = callback.data.split("_")[1]
     await state.update_data(selected_month=month)
-
+    telegram_id = callback.from_user.id
     student = get_student(telegram_id)
     year = data.get("selected_year")
     mode = data.get("mode")
 
-    try:
-        if mode == "attendance":
-            response = requests.get(f'{api}/api/bot/students/attendances/{student.platform_id}/{year}/{month}')
-            tables = response.json().get("attendances", [])
-        else:
-            response = requests.get(f'{api}/api/bot/students/scores/{student.platform_id}/{year}/{month}')
-            tables = response.json().get("score_list", [])
-    except Exception as e:
-        await callback.message.answer("❌ Ma'lumotlar olinmadi.")
-        return
+    if mode == "attendance":
+        response = requests.get(f'{API}/api/bot/students/attendances/{student.platform_id}/{year}/{month}')
+        tables = response.json().get("attendances", [])
+        if not tables:
+            await callback.message.answer("⚠️ Davomat topilmadi.")
+            return
+        text = f"📅 <b>{student.name}, sizning davomat jadvalingiz:</b>\n\n"
+        for table in tables:
+            text += f"🔷 <b>{table['subject']} ({table['name']})</b>\n👨‍🏫 O'qituvchi: <i>{table['teacher']}</i>\n📚 Darslar:\n"
+            for attendance in table['attendances']:
+                status_icon = "✅" if attendance["ball_status"] in [1, 2] else "❌"
+                text += f"  🔹 <b>{attendance['day']}</b> {status_icon}\n"
+                if attendance["ball_status"] == 2:
+                    text += f"    📌 Uy ishi: {attendance['homework']}\n"
+                    if attendance.get("dictionary"):
+                        text += f"    📖 Lug'at: {attendance['dictionary']}\n"
+                    text += f"    🎯 Aktivlik: {attendance['activeness']}\n"
+            text += "━" * 25 + "\n\n"
+        await callback.message.answer(text, parse_mode="HTML")
 
-    if not tables:
-        await callback.message.answer(f"⚠️ {mode.capitalize()} topilmadi.")
-        return
+    elif mode == "scores":
+        response = requests.get(f'{API}/api/bot/students/scores/{student.platform_id}/{year}/{month}')
+        tables = response.json().get("score_list", [])
+        if not tables:
+            await callback.message.answer("⚠️ Baholar topilmadi.")
+            return
+        text = f"📊 <b>{student.name}, {month} oyidagi baholar:</b>\n\n"
+        for table in tables:
+            text += f"🔷 <b>{table['subject']} ({table['name']})</b>\n👨‍🏫 O'qituvchi: <i>{table['teacher']}</i>\n📈 O'rtacha ball: {table['average_ball']}\n"
+            if not table['score']:
+                text += "⚠️ Baholar mavjud emas.\n"
+            else:
+                text += "📚 Darslar bo‘yicha baholar:\n"
+                for score in table['score']:
+                    text += f"  🔹 <b>{score['day']}</b> ✅\n"
+                    text += f"    📌 Uy ishi: {score['homework']}\n"
+                    text += f"    🎯 Aktivlik: {score['activeness']}\n"
+                    if score.get("dictionary"):
+                        text += f"    📖 Lug‘at: {score['dictionary']}\n"
+            text += "━" * 25 + "\n\n"
+        await callback.message.answer(text, parse_mode="HTML")
 
-    text = f"📅 <b>{student.name}, {month} oyi:</b>\n\n"
-    for table in tables:
-        text += f"🔷 <b>{table.get('subject', 'Nomaʼlum fan')} ({table.get('name', '')})</b>\n"
-        text += f"👨‍🏫 O'qituvchi: <i>{table.get('teacher', '')}</i>\n"
-
-        if mode == "attendance":
-            text += f"📚 Darslar:\n"
-            for att in table.get("attendances", []):
-                status_icon = "✅" if att.get("ball_status", 0) in [1, 2] else "❌"
-                text += f"  🔹 {att.get('day', '?')} {status_icon}\n"
-        else:
-            text += f"📈 O'rtacha ball: <b>{table.get('average_ball', 0)}</b>\n"
-            for score in table.get("score", []):
-                text += f"  🔹 {score.get('day', '?')} ✅\n"
-
-        text += "━" * 25 + "\n\n"
-
-    await callback.message.answer(text, parse_mode="HTML")
     months_keyboard = create_months_inline_keyboard(data["dates_info"], data["selected_year"])
     await callback.message.answer("✅ Yana oy tanlang:", reply_markup=months_keyboard)
 
 
+TEST_LIST_URL = "https://classroom.gennis.uz/api/pisa/test/crud/34"
+
+
+def HEADERS(token):
+    return {
+        "Authorization": f"Bearer {token}",
+        "Accept": "application/json",
+        "User-Agent": "GennisBot/1.0"
+    }
+
+
+def get_tests():
+    try:
+        resp = requests.get(TEST_LIST_URL, headers=HEADERS(GENNIS_TOKEN))
+        data = resp.json()
+        if isinstance(data, dict):
+            return [{"id": data.get("id", 34), "name": data.get("name", "Nomaʼlum test")}]
+        elif isinstance(data, list):
+            return [{"id": t["id"], "name": t["name"]} for t in data if "id" in t and "name" in t]
+    except Exception as e:
+        print(f"Xato test olishda: {e}")
+    return []
+
+
 @student_router.message(F.text == "📝 Testni boshlash")
 async def student_start_test(message: Message, state: FSMContext):
-    await student_routers(message, state)
+    tests = get_tests()
+    if not tests:
+        await message.answer("🚫 Hozircha testlar mavjud emas.")
+        return
+
+    buttons = [[KeyboardButton(text=t["name"])] for t in tests]
+    buttons.append([KeyboardButton(text="⬅️ Orqaga")])
+    keyboard = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+    await message.answer("📋 Iltimos, testni tanlang:", reply_markup=keyboard)
+    await state.update_data(tests=tests)
+    await state.set_state(TestStates.question_number)
+
+
+@student_router.message(TestStates.question_number)
+async def handle_test_selection(message: Message, state: FSMContext):
+    data = await state.get_data()
+    if message.text == "⬅️ Orqaga":
+        await state.clear()
+        await message.answer("👆 Iltimos, testni tanlang:", reply_markup=student_basic_reply_keyboard_test_type)
+        return
+
+    tests = data.get("tests", [])
+    selected = next((t for t in tests if t["name"] == message.text), None)
+    if not selected:
+        return
+
+    await message.answer(f"✅ Siz tanladingiz: <b>{selected['name']}</b>", parse_mode="HTML")
+    await message.answer("🧠 Test yuklanmoqda...", reply_markup=ReplyKeyboardRemove())
+
+    # Get questions
+    test_url = f"https://classroom.gennis.uz/api/pisa/student/get/test/{selected['id']}"
+    resp = requests.get(test_url, headers=HEADERS(GENNIS_TOKEN))
+    test_data = resp.json()
+
+    questions = []
+    for block in test_data.get("pisa_blocks_right", []):
+        options = block.get("answers", [])
+        if options:
+            questions.append({
+                "id": block.get("id"),
+                "text": block.get("q", "Savol matni yo'q"),
+                "answers": [{"text": o, "isTrue": idx == block.get("correct_answer_index", 0)} for idx, o in
+                            enumerate(options)]
+            })
+
+    if not questions:
+        await message.answer("❗️ Bu testda savollar topilmadi.", reply_markup=student_basic_reply_keyboard_test_type)
+        return
+
+    await state.update_data(
+        question_number=0,
+        score=0,
+        questions=questions,
+        test_id=selected["id"],
+        answered_questions=[]
+    )
+    await send_question(message, state)
+
+
+async def send_question(message: Message, state: FSMContext):
+    data = await state.get_data()
+    q_num = data.get("question_number", 0)
+    questions = data.get("questions", [])
+
+    if q_num >= len(questions):
+        await finish_test(message, state)
+        return
+
+    q = questions[q_num]
+    options = q.get("answers", [])
+    buttons = [[KeyboardButton(text=str(i + 1))] for i in range(len(options))]
+    buttons.append([KeyboardButton(text="❌ Testdan chiqish")])
+    keyboard = ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+
+    question_text = q.get("text", "Savol topilmadi")
+    await message.answer(
+        f"{question_text}\n\n" + "\n".join(f"{i + 1}. {opt['text']}" for i, opt in enumerate(options)),
+        reply_markup=keyboard
+    )
+
+
+@student_router.message(TestStates.question_number, F.text == "❌ Testdan chiqish")
+async def exit_test(message: Message, state: FSMContext):
+    await state.clear()
+    await message.answer("🚪 Siz testdan chiqdingiz.", reply_markup=student_basic_reply_keyboard_test_type)
+
+
+@student_router.message(TestStates.question_number, F.text.regexp(r"^\d+$"))
+async def answer_question(message: Message, state: FSMContext):
+    data = await state.get_data()
+    q_num = data.get("question_number", 0)
+    score = data.get("score", 0)
+    questions = data.get("questions", [])
+    answered_questions = data.get("answered_questions", [])
+
+    if q_num >= len(questions):
+        await finish_test(message, state)
+        return
+
+    q = questions[q_num]
+    options = q.get("answers", [])
+    user_answer = int(message.text)
+    correct_index = next((i + 1 for i, a in enumerate(options) if a["isTrue"]), None)
+    answered_questions.append(q["text"])
+
+    if 1 <= user_answer <= len(options):
+        if user_answer == correct_index:
+            score += 1
+            await message.answer("✅ To‘g‘ri!")
+        else:
+            correct_text = options[correct_index - 1]["text"] if correct_index else "?"
+            await message.answer(f"❌ Noto‘g‘ri!\nTo‘g‘ri javob: {correct_text}")
+
+    await state.update_data(
+        question_number=q_num + 1,
+        score=score,
+        answered_questions=answered_questions
+    )
+    await send_question(message, state)
+
+
+async def finish_test(message: Message, state: FSMContext):
+    data = await state.get_data()
+    score = data.get("score", 0)
+    total = len(data.get("questions", []))
+    percent = round((score / total) * 100) if total else 0
+    answered_questions = data.get("answered_questions", [])
+
+    await message.answer(
+        f"✅ Test tugadi!\nSiz {score}/{total} to‘g‘ri javob berdingiz.\n📊 Foiz: {percent}%\n📄 Javob bergan savollar:\n" +
+        "\n".join(answered_questions),
+        reply_markup=student_basic_reply_keyboard_test_type
+    )
+    await state.clear()
