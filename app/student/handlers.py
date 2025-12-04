@@ -255,6 +255,7 @@ def save_result(user_id, username, score, total, percent):
             username=username or "NoUsername",
             score=score,
             total=total,
+
             percent=percent
         )
         session.add(result)
