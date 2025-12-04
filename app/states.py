@@ -13,5 +13,9 @@ class LoginStates(StatesGroup):
     waiting_for_password = State()
 
 
-
-
+class TestStates(StatesGroup):
+    question_number = State()
+    score = State()
+    questions = State()
+    timer_task = State()
+    answer_id = State()

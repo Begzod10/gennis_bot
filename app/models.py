@@ -1,6 +1,7 @@
 # app/student/models.py
 
-from sqlalchemy import Integer, String, ForeignKey, BigInteger
+from datetime import datetime
+from sqlalchemy import Integer, String, Float, DateTime, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
 from sqlalchemy import Table, Column, ForeignKey, BigInteger
@@ -66,3 +67,14 @@ class Student(Base):
         secondary=parent_student_association,
         back_populates="students"
     )
+
+
+class TestResult(Base):
+    __tablename__ = "test_results"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(BigInteger)
+    username: Mapped[str] = mapped_column(String(100))
+    score: Mapped[int] = mapped_column(Integer)
+    total: Mapped[int] = mapped_column(Integer)
+    percent: Mapped[float] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -1,16 +1,27 @@
 from aiogram import F, types
-from aiogram.types import Message
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 import requests
+import asyncio
 import pprint
+import requests
+import functools
+from typing import Optional
+import json
+import time
+from typing import Dict
 from .keyboards import create_years_reply_keyboard, create_months_inline_keyboard, student_basic_reply_keyboard, \
     student_basic_reply_keyboard_test_type
 import os
 from dotenv import load_dotenv
 from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from aiogram import Router
 from aiogram.filters import StateFilter
-from app.states import MenuStates
+from app.states import MenuStates, TestStates
 from .utils import get_student
+from app.student.student_tests import get_tests  # headers
+from app.models import TestResult, User
+from app.db import SessionLocal, Base
 
 student_router = Router()
 years_data = {}
@@ -20,6 +31,8 @@ selected_student_year = {}
 selected_student_month = {}
 user_mode = {}
 load_dotenv()
+
+timer_tasks = {}
 
 
 @student_router.message(F.text == "💳 To'lovlar ro‘yhati")
@@ -59,7 +72,9 @@ async def test_types(message: Message):
         "👆 Iltimos, quyidagilardan birini tanlang:",
         reply_markup=student_basic_reply_keyboard_test_type
     )
-@student_router.message(F.text=="📄 Offlayn test natijalari")
+
+
+@student_router.message(F.text == "📄 Offlayn test natijalari")
 async def handle_test_results(message: Message):
     api = os.getenv('API')
     telegram_id = message.from_user.id
@@ -103,34 +118,416 @@ async def handle_test_results(message: Message):
     await message.answer(text, parse_mode="HTML")
 
 
-@student_router.message(F.text=="🖥️ Onlayn test natijalari")
-async def handle_online_test_results(message: Message):
-    api = os.getenv('API')
+timer_tasks: Dict[int, asyncio.Task] = {}
+progress_messages: Dict[int, Dict[str, int]] = {}
+QUESTION_TIME = 15
+
+
+async def safe_get(url, **kwargs):
+    def _get():
+        return requests.get(url, timeout=kwargs.pop("timeout", 10), **kwargs)
+
+    return await asyncio.to_thread(_get)
+
+
+async def safe_post(url, json_payload=None, **kwargs):
+    def _post():
+        return requests.post(url, json=json_payload, timeout=kwargs.pop("timeout", 10), **kwargs)
+
+    return await asyncio.to_thread(_post)
+
+
+def get_platform_id(telegram_id: int) -> Optional[int]:
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.telegram_id == telegram_id).first()
+        if user:
+            return user.platform_id
+        return None
+    finally:
+        session.close()
+
+
+@student_router.message(F.text == "🖥️ Onlayn test natijalari")
+async def handle_online_test_results(message: Message, state: FSMContext):
     telegram_id = message.from_user.id
-    student = get_student(telegram_id)
-    response = requests.get(f'https://classroom.gennis.uz/api/pisa/student/pisa/results/{student.platform_id}')
-    data = response.json()
+    platform_id = get_platform_id(telegram_id)
+    if not platform_id:
+        await message.answer("❌ Пользователь не найден в базе.")
+        return
+    api_url = f"https://classroom.gennis.uz/api/pisa/student/get/list_bot/{platform_id}"
+    try:
+        response = requests.get(api_url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+    except requests.RequestException as e:
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
+        return
+    except json.JSONDecodeError:
+        await message.answer("❌ Xato: server noto‘g‘ri JSON yubordi.")
+        return
+    finished_tests = [t for t in data if t.get("finished")]
+    if not finished_tests:
+        await message.answer("⚠️ Sizda yakunlangan testlar topilmadi.")
+        return
+    buttons = []
+    for t in finished_tests:
+        pisa_id = t.get("id")
+        buttons.append(
+            [InlineKeyboardButton(text=t.get("name", "Test"), callback_data=f"online_test_{pisa_id}")]
+        )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    sent_msg = await message.answer("📋 Iltimos, yakunlangan testlardan birini tanlang:", reply_markup=keyboard)
+    await state.update_data(finished_tests=finished_tests, last_message_id=sent_msg.message_id)
 
-    test_results = data.get('data', [])
 
-    if not test_results:
-        await message.answer("⚠️ Onlayn test natijalari topilmadi.")
+@student_router.callback_query(lambda c: c.data.startswith("online_test_"))
+async def show_selected_online_test(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    pisa_id = int(callback.data.split("_")[-1])
+    telegram_id = callback.from_user.id
+    platform_id = get_platform_id(telegram_id)
+    if not platform_id:
+        await callback.message.edit_text("❌ Sizning hisobingiz topilmadi.")
+        return
+    api_url = f"https://classroom.gennis.uz/api/pisa/student/show/result_bot/{pisa_id}/{platform_id}"
+    try:
+        resp = await safe_get(api_url)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        await callback.message.edit_text(f"❌ Xatolik yuz berdi: {e}")
+        return
+    result = data.get("test", {})
+    text = (
+        f"💻 <b>{callback.from_user.full_name}, onlayn test natijalari:</b>\n\n"
+        f"📅 <b>Sana:</b> {result.get('test_date', 'N/A')}\n"
+        f"📚 <b>Test nomi:</b> {result.get('pisa_name', 'N/A')}\n"
+        f"✅ <b>To‘g‘ri javoblar:</b> {result.get('true_answers', 0)} ta\n"
+        f"❌ <b>Noto‘g‘ri javoblar:</b> {result.get('false_answers', 0)} ta\n"
+        f"📊 <b>Natija:</b> {result.get('result', 0)}%\n"
+        f"📋 <b>Savollar soni:</b> {result.get('total_questions', 0)} ta\n"
+    )
+    back_button = InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text="⬅️ Orqaga", callback_data="back_to_tests")]]
+    )
+    await callback.message.edit_text(text, parse_mode="HTML", reply_markup=back_button)
+
+
+@student_router.callback_query(F.data == "back_to_tests")
+async def back_to_tests(callback: types.CallbackQuery, state: FSMContext):
+    await callback.answer()
+    telegram_id = callback.from_user.id
+    platform_id = get_platform_id(telegram_id)
+    if not platform_id:
+        await callback.message.edit_text("❌ Sizning hisobingiz topilmadi.")
+        return
+    api_url = f"https://classroom.gennis.uz/api/pisa/student/get/list_bot/{platform_id}"
+    try:
+        response = requests.get(api_url, timeout=10)
+        response.raise_for_status()
+        data = response.json()
+    except Exception as e:
+        await callback.message.edit_text(f"❌ Xatolik yuz berdi: {e}")
+        return
+    finished_tests = [t for t in data if t.get("finished")]
+    if not finished_tests:
+        await callback.message.edit_text("⚠️ Sizda yakunlangan testlar topilmadi.")
+        return
+    buttons = []
+    for t in finished_tests:
+        pisa_id = t.get("id")
+        buttons.append(
+            [InlineKeyboardButton(text=t.get("name", "Test"), callback_data=f"online_test_{pisa_id}")]
+        )
+    keyboard = InlineKeyboardMarkup(inline_keyboard=buttons)
+    await callback.message.edit_text(
+        "📋 Iltimos, yakunlangan testlardan birini tanlang:",
+        reply_markup=keyboard
+    )
+
+
+def save_result(user_id, username, score, total, percent):
+    session = SessionLocal()
+    try:
+        result = TestResult(
+            user_id=user_id,
+            username=username or "NoUsername",
+            score=score,
+            total=total,
+            percent=percent
+        )
+        session.add(result)
+        session.commit()
+    except Exception as e:
+        session.rollback()
+        print(f"Error saving results: {e}")
+    finally:
+        session.close()
+
+
+def result_exit_keyboard():
+    return types.ReplyKeyboardMarkup(
+        keyboard=[[types.KeyboardButton(text="⬅️ Orqaga")]],
+        resize_keyboard=True
+    )
+
+
+@student_router.message(StateFilter("*"), F.text == "⬅️ Orqaga")
+async def back_to_menu(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.answer(
+        "👆 Iltimos, quyidagilardan birini tanlang:",
+        reply_markup=student_basic_reply_keyboard_test_type
+    )
+
+
+@student_router.message(F.text == "🏁 Onlayn test yechish")
+async def show_tests(message: types.Message, state: FSMContext):
+    tests = get_tests()
+    if not tests:
+        await message.answer("🚫 Hozircha testlar mavjud emas.")
+        return
+    available_tests = [t for t in tests if not t.get("finished")]
+    if not available_tests:
+        await message.answer("✅ Siz barcha testlarni yakunlagansiz!")
+        return
+    buttons = [[types.KeyboardButton(text=t["name"])] for t in available_tests]
+    buttons.append([types.KeyboardButton(text="⬅️ Orqaga")])
+    keyboard = types.ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
+    await message.answer("📋 Iltimos, testni tanlang:", reply_markup=keyboard)
+    await state.update_data(tests=available_tests)
+
+
+@student_router.message(StateFilter(None))
+async def select_test(message: types.Message, state: FSMContext):
+    if message.text in ("⬅️ Orqaga", "📊 Natijalarni ko‘rish", "🏁 Testni boshlash", "ℹ️ Yordam"):
+        if message.text == "⬅️ Orqaga":
+            await message.answer("👆 Iltimos, quyidagilardan birini tanlang:",
+                                 reply_markup=student_basic_reply_keyboard_test_type)
+        return
+    data = await state.get_data()
+    telegram_id = message.from_user.id
+    platform_id = get_platform_id(telegram_id)
+    if not platform_id:
+        await message.answer("❌ Sizning hisobingiz topilmadi.")
+        return
+    tests = data.get("tests", [])
+    selected = next((t for t in tests if t["name"] == message.text), None)
+    if not selected:
+        return
+    await message.answer(f"✅ Siz tanladingiz: <b>{selected['name']}</b>", parse_mode="HTML")
+    await message.answer("🧠 Test yuklanmoqda...", reply_markup=types.ReplyKeyboardRemove())
+    test_url = f"https://classroom.gennis.uz/api/pisa/student/get/test_bot/{selected['id']}/{platform_id}"
+    try:
+        response = requests.get(test_url)  # headers=headers
+    except Exception as e:
+        await message.answer(f"🚫 So‘rovda xatolik: {e}")
+        return
+    if response.status_code != 200 or not response.text.strip():
+        await message.answer(f"⚠️ Server xatosi ({response.status_code}) yoki bo‘sh javob.")
+        return
+    try:
+        test_data = response.json()
+    except json.JSONDecodeError:
+        await message.answer("⚠️ Server noto‘g‘ri JSON yubordi.")
+        return
+    questions = []
+    for block in test_data.get("pisa_blocks_right", []):
+        if block.get("innerType") == "text" and block.get("options"):
+            answers = [{"text": opt.get("text"), "isTrue": opt.get("isTrue")} for opt in block["options"]]
+            questions = []
+            for block in test_data.get("pisa_blocks_right", []):
+                if block.get("innerType") == "text" and block.get("options"):
+                    answers = [
+                        {
+                            "id": opt.get("id"),
+                            "text": opt.get("text"),
+                            "isTrue": opt.get("isTrue")
+                        }
+                        for opt in block["options"]
+                    ]
+                    questions.append({
+                        "id": block["id"],
+                        "text": block.get("text", "Savol topilmadi"),
+                        "answers": answers
+                    })
+    if not questions:
+        await message.answer("❗️ Bu testda savollar topilmadi yoki noto‘g‘ri formatda.",
+                             reply_markup=student_basic_reply_keyboard_test_type)
+        return
+    await state.update_data(question_number=0, score=0, questions=questions, test_id=selected["id"])
+    await message.answer(
+        f"📘 Test: <b>{selected['name']}</b>\n"
+        f"📄 Savollar soni: {len(questions)}\n\n"
+        "Boshlaymiz! 💪",
+        parse_mode="HTML"
+    )
+    await state.set_state(TestStates.question_number)
+    await send_question(message, state)
+
+
+async def send_question(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    q_num = data.get("question_number", 0)
+    questions = data.get("questions", [])
+    chat_id = message.chat.id
+    prev_task = timer_tasks.get(chat_id)
+    if prev_task and not prev_task.done():
+        prev_task.cancel()
+    if q_num >= len(questions):
+        await finish_test(message, state)
+        return
+    q = questions[q_num]
+    options = q.get("answers", [])
+    question_text = q.get("text", "Savol topilmadi")
+    options_text = "\n".join(f"{i + 1}. {opt['text']}" for i, opt in enumerate(options))
+    sent = await message.answer(f"{question_text}\n\n{options_text}",
+                                reply_markup=types.ReplyKeyboardMarkup(
+                                    keyboard=[[types.KeyboardButton(text=str(i + 1))] for i in range(len(options))] + [
+                                        [types.KeyboardButton(text="❌ Testdan chiqish")]],
+                                    resize_keyboard=True
+                                )
+                                )
+    progress_msg = await message.answer(f"⏳ {QUESTION_TIME:02d}s 【{'●' * QUESTION_TIME}】")
+    progress_messages[chat_id] = {"progress_id": progress_msg.message_id, "question_message_id": sent.message_id}
+    task = asyncio.create_task(question_timer(message, state, q_num, progress_msg.message_id))
+    timer_tasks[chat_id] = task
+    await state.update_data(waiting_answer=True)
+
+
+async def question_timer(message: types.Message, state: FSMContext, q_num: int, progress_message_id: int):
+    chat_id = message.chat.id
+    total_time = QUESTION_TIME
+    try:
+        for remaining in range(total_time, 0, -1):
+            bar = f"⏳ {remaining:02d}s 【{'●' * remaining}{'○' * (total_time - remaining)}】"
+            try:
+                await message.bot.edit_message_text(bar, chat_id=chat_id, message_id=progress_message_id)
+            except Exception:
+                pass
+            await asyncio.sleep(1)
+        data = await state.get_data()
+        if data.get("waiting_answer") and data.get("question_number") == q_num:
+            try:
+                await message.bot.send_message(chat_id, "⌛️ Vaqt tugadi! Keyingi savolga o'tamiz.")
+            except Exception:
+                pass
+            await state.update_data(waiting_answer=False, question_number=q_num + 1)
+            progress_messages.pop(chat_id, None)
+            timer_tasks.pop(chat_id, None)
+            await asyncio.sleep(0.5)
+            await send_question(message, state)
+    except asyncio.CancelledError:
         return
 
-    text = f"💻 <b>{student.name}, onlayn test natijalari:</b>\n\n"
-    for result in test_results:
-        text += (
-            f"📅 <b>Sana:</b> {result['test_date']}\n"
-            f"📚 <b>Test nomi:</b> {result['pisa_name']}\n"
-            f"✅ <b>To‘g‘ri javoblar:</b> {result['true_answers']} ta\n"
-            f"❌ <b>Noto‘g‘ri javoblar:</b> {result['false_answers']} ta\n"
-            f"📊 <b>Natija:</b> {result['result']}%\n"
-            f"📋 <b>Savollar soni:</b> {result['total_questions']} ta\n"
-            f"🌍 <b>Joylashuv:</b> {result['location']['name']}\n"
-        )
-        text += "━" * 20 + "\n"
 
-    await message.answer(text, parse_mode="HTML")
+@student_router.message(TestStates.question_number, F.text == "❌ Testdan chiqish")
+async def exit_test(message: types.Message, state: FSMContext):
+    chat_id = message.chat.id
+    task = timer_tasks.get(chat_id)
+    if task and not task.done():
+        task.cancel()
+    timer_tasks.pop(chat_id, None)
+    progress_messages.pop(chat_id, None)
+    await state.clear()
+    await message.answer("🚪 Siz testdan chiqdingiz.", reply_markup=student_basic_reply_keyboard_test_type)
+
+
+@student_router.message(TestStates.question_number, F.text.regexp(r"^\d+$"))
+async def answer_question(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    q_num = data.get("question_number", 0)
+    score = data.get("score", 0)
+    questions = data.get("questions", [])
+    chat_id = message.chat.id
+    prev_task = timer_tasks.get(chat_id)
+    if prev_task and not prev_task.done():
+        prev_task.cancel()
+    if q_num >= len(questions):
+        await finish_test(message, state)
+        return
+    q = questions[q_num]
+    options = q.get("answers", [])
+    user_answer = int(message.text)
+    if 1 <= user_answer <= len(options):
+        correct_index = next((i + 1 for i, a in enumerate(options) if a.get("isTrue")), None)
+        user_answers = data.get("user_answers", {})
+        block_id = q["id"]
+        answer_id = options[user_answer - 1]["id"]
+        user_answers[block_id] = {
+            "block_id": block_id,
+            "type": "select",
+            "answer": {"id": answer_id}
+        }
+        await state.update_data(user_answers=user_answers)
+        await state.update_data(waiting_answer=False)
+        if user_answer == correct_index:
+            score += 1
+            await message.answer("✅ To‘g‘ri!")
+        else:
+            correct_text = options[correct_index - 1]["text"] if correct_index else "?"
+            await message.answer(f"❌ Noto‘g‘ri!\nTo‘g‘ri javob: {correct_text}")
+        await state.update_data(question_number=q_num + 1, score=score)
+        await send_question(message, state)
+    else:
+        await message.answer("⚠️ Iltimos, to‘g‘ri raqamni tanlang.")
+
+
+async def finish_test(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    user_answers = data.get("user_answers", {})
+    test_id = data.get("test_id")
+    score = data.get("score", 0)
+    questions = data.get("questions", [])
+    total = len(questions)
+    percent = round((score / total) * 100) if total else 0
+    if not test_id:
+        await message.answer("❌ Test ID topilmadi.")
+        return
+    telegram_id = message.from_user.id
+    platform_id = get_platform_id(telegram_id)
+    if not platform_id:
+        await message.answer("❌ Sizning hisobingiz topilmadi.")
+        return
+    for answer_object in user_answers.values():
+        complete_url = f"https://classroom.gennis.uz/api/pisa/student/complete/pisa/test_bot/{test_id}/{platform_id}"
+        resp = await safe_post(
+            complete_url,
+            json_payload=answer_object,
+            headers={
+                "Accept": "application/json",
+                "Content-Type": "application/json"
+            }
+        )
+        print("[DEBUG] SEND ONE:", answer_object)
+        print("[DEBUG] STATUS:", resp.status_code)
+        print("[DEBUG] RESP:", resp.text)
+        if resp.status_code != 200:
+            await message.answer(f"⚠️ Xatolik: {resp.status_code}")
+            return
+    show_url = f"https://classroom.gennis.uz/api/pisa/student/show/result_bot/{test_id}/{platform_id}"
+    try:
+        result_resp = await safe_get(show_url)
+        result_resp.raise_for_status()
+        result_data = result_resp.json()
+        print("[DEBUG] SHOW RESULT:", result_data)
+    except Exception as e:
+        await message.answer(f"⚠️ Xatolik olishda natijalar: {e}")
+        result_data = {}
+    await message.answer("✅ Test muvaffaqiyatli yakunlandi!")
+    await message.answer(
+        f"🏁 Test tugadi!\n"
+        f"To‘g‘ri javoblar: {score}/{total}\n"
+        f"Foiz: {percent}%",
+        reply_markup=student_basic_reply_keyboard_test_type
+    )
+    chat_id = message.chat.id
+    task = timer_tasks.pop(chat_id, None)
+    if task and not task.done():
+        task.cancel()
+    progress_messages.pop(chat_id, None)
+    await state.clear()
 
 
 @student_router.message(F.text == "📝 Davomatlar ro‘yhati")
