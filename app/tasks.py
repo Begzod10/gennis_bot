@@ -48,6 +48,7 @@ def process_login_task(telegram_id, username, password):
         else:
             user.name = user_data['name']
             user.surname = user_data['surname']
+            user.platform_id = user_data['id']
             requests.get(f'{api}/api/bot/users/telegram_id/{user.platform_id}/{user.telegram_id}')
         session.commit()
 
