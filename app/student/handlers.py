@@ -285,19 +285,32 @@ async def back_to_menu(message: types.Message, state: FSMContext):
 
 @student_router.message(F.text == "🏁 Onlayn test yechish")
 async def show_tests(message: types.Message, state: FSMContext):
-    tests = get_tests()
-    if not tests:
-        await message.answer("🚫 Hozircha testlar mavjud emas.")
+    telegram_id = message.from_user.id
+    platform_id = get_platform_id(telegram_id)
+    if not platform_id:
+        await message.answer("❌ Sizning hisobingiz topilmadi.")
         return
-    available_tests = [t for t in tests if not t.get("finished")]
+    api_url = f"https://classroom.gennis.uz/api/pisa/student/get/list_bot/{platform_id}"
+    try:
+        resp = await safe_get(api_url)
+        resp.raise_for_status()
+        tests = resp.json()
+    except Exception as e:
+        await message.answer(f"❌ Xatolik: {e}")
+        return
+    if not isinstance(tests, list):
+        await message.answer("⚠️ Server noto‘g‘ri format yubordi (kutilgan list).")
+        return
+    available_tests = [t for t in tests if not t.get("finished", False)]
     if not available_tests:
         await message.answer("✅ Siz barcha testlarni yakunlagansiz!")
+        await state.clear()
         return
     buttons = [[types.KeyboardButton(text=t["name"])] for t in available_tests]
     buttons.append([types.KeyboardButton(text="⬅️ Orqaga")])
     keyboard = types.ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
-    await message.answer("📋 Iltimos, testni tanlang:", reply_markup=keyboard)
     await state.update_data(tests=available_tests)
+    await message.answer("📋 Iltimos, testni tanlang:", reply_markup=keyboard)
 
 
 @student_router.message(StateFilter(None))
