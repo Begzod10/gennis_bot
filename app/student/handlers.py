@@ -19,7 +19,6 @@ from aiogram import Router
 from aiogram.filters import StateFilter
 from app.states import MenuStates, TestStates
 from .utils import get_student
-from app.student.student_tests import get_tests  # headers
 from app.models import TestResult, User
 from app.db import SessionLocal, Base
 
@@ -333,6 +332,7 @@ async def select_test(message: types.Message, state: FSMContext):
     await message.answer(f"✅ Siz tanladingiz: <b>{selected['name']}</b>", parse_mode="HTML")
     await message.answer("🧠 Test yuklanmoqda...", reply_markup=types.ReplyKeyboardRemove())
     test_url = f"https://classroom.gennis.uz/api/pisa/student/get/test_bot/{selected['id']}/{platform_id}"
+    print(selected['id'])
     try:
         response = requests.get(test_url)  # headers=headers
     except Exception as e:
