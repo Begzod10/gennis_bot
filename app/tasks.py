@@ -5,6 +5,9 @@ from app.models import User, Student, Teacher, Parent
 import os
 from app.celery_app import celery
 import logging
+from app.teacher.keyboards import teacher_basic_reply_keyboard
+from app.student.keyboards import student_basic_reply_keyboard
+from app.parent.keyboards import generate_student_keyboard_for_parent
 
 logger = logging.getLogger(__name__)
 
@@ -151,12 +154,18 @@ def send_balance_to_users():
                             data = response.json()
 
                             if user.user_type in ("teacher", "student"):
+                                if user.user_type == "teacher":
+                                    keyboard = teacher_basic_reply_keyboard
+                                else:
+                                    keyboard = student_basic_reply_keyboard
                                 balance = data.get('balance')
                                 ball_history = data.get('ball_history')
                                 text = f"📢 Sizning hisobingiz: {balance} so'm"
                                 text += format_ball_history(ball_history)
-                                await bot.send_message(chat_id=user.telegram_id, text=text)
+                                await bot.send_message(chat_id=user.telegram_id, text=text, reply_markup=keyboard)
                             else:  # parent
+                                get_parent = SessionLocal().query(Parent).filter(Parent.user_id == user.id).first()
+                                reply_keyboard = generate_student_keyboard_for_parent(get_parent, user.telegram_id)
                                 student_list = data.get('student_list', [])
                                 for student in student_list:
                                     balance = student.get('balance')
@@ -164,7 +173,8 @@ def send_balance_to_users():
                                     text = f"📢 {student.get('name')}ning hisobi: {balance} so'm"
                                     text += format_ball_history(ball_history)
 
-                                    await bot.send_message(chat_id=user.telegram_id, text=text)
+                                    await bot.send_message(chat_id=user.telegram_id, text=text,
+                                                           reply_markup=reply_keyboard)
 
                     except Exception as e:
                         print(f"❌ Failed to send to {user.telegram_id}: {e}")
