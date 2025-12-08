@@ -18,7 +18,7 @@ teacher_years_data = {}
 selected_year = {}
 
 
-@teacher_router.message(lambda msg: msg.text and "oyliklar" in msg.text.lower())
+@teacher_router.message(F.text == "💳 Oyliklar ro‘yhati")
 async def get_oyliklar_royxati(message: Message, state: FSMContext):
     api = os.getenv('API')
     telegram_user = message.from_user

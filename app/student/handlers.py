@@ -30,8 +30,10 @@ selected_student_year = {}
 selected_student_month = {}
 user_mode = {}
 load_dotenv()
+timer_tasks: Dict[int, asyncio.Task] = {}
+progress_messages: Dict[int, Dict[str, int]] = {}
+QUESTION_TIME = 15
 
-timer_tasks = {}
 
 
 @student_router.message(F.text == "💳 To'lovlar ro‘yhati")
@@ -117,9 +119,7 @@ async def handle_test_results(message: Message):
     await message.answer(text, parse_mode="HTML")
 
 
-timer_tasks: Dict[int, asyncio.Task] = {}
-progress_messages: Dict[int, Dict[str, int]] = {}
-QUESTION_TIME = 15
+
 
 
 async def safe_get(url, **kwargs):
