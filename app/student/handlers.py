@@ -17,10 +17,9 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram import Router
 from aiogram.filters import StateFilter
 from app.states import MenuStates, TestStates
-from .utils import get_student
+from .utils import get_student, timer_tasks, progress_messages, QUESTION_TIME, safe_get, safe_post, get_platform_id
 from app.models import TestResult, User
 from app.db import SessionLocal, Base
-from utils import timer_tasks, progress_messages, QUESTION_TIME, safe_get, safe_post, get_platform_id
 
 student_router = Router()
 years_data = {}
