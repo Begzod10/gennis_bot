@@ -1,7 +1,39 @@
 from app.redis_client import redis_client
 from app.models import Student, Parent, User
 from app.db import SessionLocal
+from typing import Dict, Optional
 import json
+import asyncio
+import requests
+
+timer_tasks: Dict[int, asyncio.Task] = {}
+progress_messages: Dict[int, Dict[str, int]] = {}
+QUESTION_TIME = 15
+
+
+async def safe_get(url, **kwargs):
+    def _get():
+        return requests.get(url, timeout=kwargs.pop("timeout", 10), **kwargs)
+
+    return await asyncio.to_thread(_get)
+
+
+async def safe_post(url, json_payload=None, **kwargs):
+    def _post():
+        return requests.post(url, json=json_payload, timeout=kwargs.pop("timeout", 10), **kwargs)
+
+    return await asyncio.to_thread(_post)
+
+
+def get_platform_id(telegram_id: int) -> Optional[int]:
+    session = SessionLocal()
+    try:
+        user = session.query(User).filter(User.telegram_id == telegram_id).first()
+        if user:
+            return user.platform_id
+        return None
+    finally:
+        session.close()
 
 
 def get_student(telegram_id):

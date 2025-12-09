@@ -1,17 +1,16 @@
-from aiogram import F, types
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 import requests
 import asyncio
 import pprint
 import requests
 import functools
-from typing import Optional
 import json
 import time
-from typing import Dict
+import os
+
+from aiogram import F, types
+from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
 from .keyboards import create_years_reply_keyboard, create_months_inline_keyboard, student_basic_reply_keyboard, \
     student_basic_reply_keyboard_test_type
-import os
 from dotenv import load_dotenv
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -21,6 +20,7 @@ from app.states import MenuStates, TestStates
 from .utils import get_student
 from app.models import TestResult, User
 from app.db import SessionLocal, Base
+from utils import timer_tasks, progress_messages, QUESTION_TIME, safe_get, safe_post, get_platform_id
 
 student_router = Router()
 years_data = {}
@@ -115,36 +115,6 @@ async def handle_test_results(message: Message):
         text += "═" * 25 + "\n\n"
 
     await message.answer(text, parse_mode="HTML")
-
-
-timer_tasks: Dict[int, asyncio.Task] = {}
-progress_messages: Dict[int, Dict[str, int]] = {}
-QUESTION_TIME = 15
-
-
-async def safe_get(url, **kwargs):
-    def _get():
-        return requests.get(url, timeout=kwargs.pop("timeout", 10), **kwargs)
-
-    return await asyncio.to_thread(_get)
-
-
-async def safe_post(url, json_payload=None, **kwargs):
-    def _post():
-        return requests.post(url, json=json_payload, timeout=kwargs.pop("timeout", 10), **kwargs)
-
-    return await asyncio.to_thread(_post)
-
-
-def get_platform_id(telegram_id: int) -> Optional[int]:
-    session = SessionLocal()
-    try:
-        user = session.query(User).filter(User.telegram_id == telegram_id).first()
-        if user:
-            return user.platform_id
-        return None
-    finally:
-        session.close()
 
 
 @student_router.message(F.text == "🖥️ Onlayn test natijalari")
@@ -246,33 +216,6 @@ async def back_to_tests(callback: types.CallbackQuery, state: FSMContext):
     )
 
 
-def save_result(user_id, username, score, total, percent):
-    session = SessionLocal()
-    try:
-        result = TestResult(
-            user_id=user_id,
-            username=username or "NoUsername",
-            score=score,
-            total=total,
-
-            percent=percent
-        )
-        session.add(result)
-        session.commit()
-    except Exception as e:
-        session.rollback()
-        print(f"Error saving results: {e}")
-    finally:
-        session.close()
-
-
-def result_exit_keyboard():
-    return types.ReplyKeyboardMarkup(
-        keyboard=[[types.KeyboardButton(text="⬅️ Orqaga")]],
-        resize_keyboard=True
-    )
-
-
 @student_router.message(StateFilter("*"), F.text == "⬅️ Orqaga")
 async def back_to_menu(message: types.Message, state: FSMContext):
     await state.clear()
@@ -332,7 +275,6 @@ async def select_test(message: types.Message, state: FSMContext):
     await message.answer(f"✅ Siz tanladingiz: <b>{selected['name']}</b>", parse_mode="HTML")
     await message.answer("🧠 Test yuklanmoqda...", reply_markup=types.ReplyKeyboardRemove())
     test_url = f"https://classroom.gennis.uz/api/pisa/student/get/test_bot/{selected['id']}/{platform_id}"
-    print(selected['id'])
     try:
         response = requests.get(test_url)  # headers=headers
     except Exception as e:
@@ -514,9 +456,6 @@ async def finish_test(message: types.Message, state: FSMContext):
                 "Content-Type": "application/json"
             }
         )
-        print("[DEBUG] SEND ONE:", answer_object)
-        print("[DEBUG] STATUS:", resp.status_code)
-        print("[DEBUG] RESP:", resp.text)
         if resp.status_code != 200:
             await message.answer(f"⚠️ Xatolik: {resp.status_code}")
             return
@@ -525,7 +464,6 @@ async def finish_test(message: types.Message, state: FSMContext):
         result_resp = await safe_get(show_url)
         result_resp.raise_for_status()
         result_data = result_resp.json()
-        print("[DEBUG] SHOW RESULT:", result_data)
     except Exception as e:
         await message.answer(f"⚠️ Xatolik olishda natijalar: {e}")
         result_data = {}
