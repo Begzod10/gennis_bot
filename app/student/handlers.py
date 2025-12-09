@@ -29,7 +29,6 @@ selected_student_year = {}
 selected_student_month = {}
 user_mode = {}
 load_dotenv()
-
 timer_tasks = {}
 
 
@@ -259,7 +258,7 @@ async def select_test(message: types.Message, state: FSMContext):
     if message.text in ("⬅️ Orqaga", "📊 Natijalarni ko‘rish", "🏁 Testni boshlash", "ℹ️ Yordam"):
         if message.text == "⬅️ Orqaga":
             await message.answer("👆 Iltimos, quyidagilardan birini tanlang:",
-                                 reply_markup=student_basic_reply_keyboard_test_type)
+                                 reply_markup=student_basic_reply_keyboard)
         return
     data = await state.get_data()
     telegram_id = message.from_user.id

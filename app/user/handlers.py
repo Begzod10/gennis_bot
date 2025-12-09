@@ -9,7 +9,7 @@ import requests
 from app.student.keyboards import student_basic_reply_keyboard, student_basic_reply_keyboard_for_parent
 from app.teacher.keyboards import teacher_basic_reply_keyboard
 from app.parent.keyboards import generate_student_keyboard_for_parent
-from app.states import MenuStates, TestStates
+from app.states import MenuStates
 from .utils import get_user_data
 import os
 from dotenv import load_dotenv
@@ -116,15 +116,13 @@ async def back(message: Message, state: FSMContext):
             await state.set_state(MenuStates.menu)
         elif current_state == MenuStates.menu:
             reply = generate_student_keyboard_for_parent(parent, telegram_id)
-        elif get_user.user_type == 'student':
-            if current_state == MenuStates.attendances:
-                reply = student_basic_reply_keyboard
-            elif current_state == MenuStates.scores:
-                reply = student_basic_reply_keyboard
-            elif current_state == TestStates.question_number:
-                reply = student_basic_reply_keyboard
-            else:
-                reply = student_basic_reply_keyboard
+    elif get_user.user_type == 'student':
+        if current_state == MenuStates.attendances:
+            reply = student_basic_reply_keyboard
+        elif current_state == MenuStates.scores:
+            reply = student_basic_reply_keyboard
+        else:
+            reply = student_basic_reply_keyboard
     elif get_user.user_type == 'teacher':
         if current_state == MenuStates.salary:
             reply = teacher_basic_reply_keyboard
