@@ -13,18 +13,18 @@ celery = Celery(
     backend=os.getenv('CELERY_RESULT_BACKEND')
 )
 
-# celery.conf.beat_schedule = {
-#     'send-balance-daily-midnight': {
-#         'task': 'app.tasks.send_balance_to_users',
-#         'schedule': crontab(minute=0, hour=0),  # Runs at 00:00 every day
-#     },
-# }
 celery.conf.beat_schedule = {
     'send-balance-daily-midnight': {
         'task': 'app.tasks.send_balance_to_users',
-        'schedule': crontab(minute="*"),  # Runs at 00:00 every day
+        'schedule': crontab(minute=0, hour=0),  # Runs at 00:00 every day
     },
 }
+# celery.conf.beat_schedule = {
+#     'send-balance-daily-midnight': {
+#         'task': 'app.tasks.send_balance_to_users',
+#         'schedule': crontab(minute="*"),  # Runs at 00:00 every day
+#     },
+# }
 
 celery.conf.timezone = 'Asia/Tashkent'  # Optional but recommended
 from app import tasks
