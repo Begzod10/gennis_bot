@@ -66,7 +66,7 @@ def process_login_task(telegram_id, username, password):
         if result["user_type"] == "student":
             other_students = session.query(Student).filter(Student.user_id == user.id).all()
             for student in other_students:
-                student.user_id = None
+                session.delete(student)
                 session.commit()
             student_data = user_data["student"]
             student = session.query(Student).filter(Student.platform_id == student_data['id']).first()
@@ -90,7 +90,7 @@ def process_login_task(telegram_id, username, password):
             session.commit()
             parent_get = session.query(Parent).filter(Parent.user_id == user.id).first()
             if parent_get:
-                parent_get.user_id = None
+                session.delete(parent_get)
                 session.commit()
         elif result["user_type"] == "parent":
 
