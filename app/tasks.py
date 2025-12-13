@@ -22,7 +22,6 @@ def process_login_task(telegram_id, username, password):
         "username": username,
         "password": password
     })
-    print(response)
     parent = response.json().get('parent') if 'parent' in response.json() else None
     result = {
         "success": False,
@@ -89,6 +88,10 @@ def process_login_task(telegram_id, username, password):
             else:
                 teacher.platform_id = teacher_data['id']
             session.commit()
+            parent_get = session.query(Parent).filter(Parent.user_id == user.id).first()
+            if parent_get:
+                parent_get.user_id = None
+                session.commit()
         elif result["user_type"] == "parent":
 
             parent_get = session.query(Parent).filter(Parent.user_id == user.id).first()
