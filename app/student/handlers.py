@@ -250,31 +250,32 @@ async def show_tests(message: types.Message, state: FSMContext):
     buttons.append([types.KeyboardButton(text="⬅️ Orqaga")])
     keyboard = types.ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
     await state.update_data(tests=available_tests)
+    await state.set_state(TestStates.selecting_test)
     await message.answer("📋 Iltimos, testni tanlang:", reply_markup=keyboard)
 
 
-@student_router.message(StateFilter(None))
+@student_router.message(TestStates.selecting_test)
 async def select_test(message: types.Message, state: FSMContext):
-    if message.text in ("⬅️ Orqaga", "📊 Natijalarni ko‘rish", "🏁 Testni boshlash", "ℹ️ Yordam"):
-        if message.text == "⬅️ Orqaga":
-            await message.answer("👆 Iltimos, quyidagilardan birini tanlang:",
-                                 reply_markup=student_basic_reply_keyboard)
+    if message.text == "⬅️ Orqaga":
+        await state.clear()
+        await message.answer(
+            "👆 Iltimos, quyidagilardan birini tanlang:",
+            reply_markup=student_basic_reply_keyboard_test_type
+        )
         return
     data = await state.get_data()
-    telegram_id = message.from_user.id
-    platform_id = get_platform_id(telegram_id)
-    if not platform_id:
-        await message.answer("❌ Sizning hisobingiz topilmadi.")
-        return
     tests = data.get("tests", [])
     selected = next((t for t in tests if t["name"] == message.text), None)
     if not selected:
+        await message.answer("⚠️ Iltimos, ro‘yxatdan test tanlang.")
         return
     await message.answer(f"✅ Siz tanladingiz: <b>{selected['name']}</b>", parse_mode="HTML")
     await message.answer("🧠 Test yuklanmoqda...", reply_markup=types.ReplyKeyboardRemove())
+    telegram_id = message.from_user.id
+    platform_id = get_platform_id(telegram_id)
     test_url = f"https://classroom.gennis.uz/api/pisa/student/get/test_bot/{selected['id']}/{platform_id}"
     try:
-        response = requests.get(test_url)  # headers=headers
+        response = requests.get(test_url)
     except Exception as e:
         await message.answer(f"🚫 So‘rovda xatolik: {e}")
         return
@@ -289,35 +290,26 @@ async def select_test(message: types.Message, state: FSMContext):
     questions = []
     for block in test_data.get("pisa_blocks_right", []):
         if block.get("innerType") == "text" and block.get("options"):
-            answers = [{"text": opt.get("text"), "isTrue": opt.get("isTrue")} for opt in block["options"]]
-            questions = []
-            for block in test_data.get("pisa_blocks_right", []):
-                if block.get("innerType") == "text" and block.get("options"):
-                    answers = [
-                        {
-                            "id": opt.get("id"),
-                            "text": opt.get("text"),
-                            "isTrue": opt.get("isTrue")
-                        }
-                        for opt in block["options"]
-                    ]
-                    questions.append({
-                        "id": block["id"],
-                        "text": block.get("text", "Savol topilmadi"),
-                        "answers": answers
-                    })
+            answers = [{"id": opt.get("id"), "text": opt.get("text"), "isTrue": opt.get("isTrue")} for opt in
+                       block["options"]]
+            questions.append({
+                "id": block["id"],
+                "text": block.get("text", "Savol topilmadi"),
+                "answers": answers
+            })
     if not questions:
         await message.answer("❗️ Bu testda savollar topilmadi yoki noto‘g‘ri formatda.",
                              reply_markup=student_basic_reply_keyboard_test_type)
+        await state.clear()
         return
     await state.update_data(question_number=0, score=0, questions=questions, test_id=selected["id"])
+    await state.set_state(TestStates.question_number)
     await message.answer(
         f"📘 Test: <b>{selected['name']}</b>\n"
         f"📄 Savollar soni: {len(questions)}\n\n"
         "Boshlaymiz! 💪",
         parse_mode="HTML"
     )
-    await state.set_state(TestStates.question_number)
     await send_question(message, state)
 
 

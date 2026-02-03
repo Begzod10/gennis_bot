@@ -11,6 +11,7 @@ from .keyboards import teacher_years_keyboard
 import os
 from dotenv import load_dotenv
 from app.states import MenuStates
+from app.student.utils import safe_post, safe_get
 
 load_dotenv()
 teacher_router = Router()
@@ -171,3 +172,58 @@ async def handle_click(callback_query: CallbackQuery):
             await callback_query.message.answer(payment_text[i:i + 4000], parse_mode="HTML")
     else:
         await callback_query.message.answer(payment_text, parse_mode="HTML")
+
+
+@teacher_router.message(lambda msg: msg.text and "👥 Guruhlar" in msg.text)
+async def get_teacher_groups(message: Message):
+    telegram_id = message.from_user.id
+    print(f"DEBUG: Нажата кнопка с текстом: {message.text} (telegram_id={telegram_id})")
+    api_token = os.getenv("GENNIS_TOKEN")
+    headers = {"Authorization": f"Bearer {api_token}"}
+    try:
+        response = await safe_get(
+            "https://classroom.gennis.uz/api/group/get_groups",
+            headers=headers
+        )
+        try:
+            groups = response.json()
+        except Exception as e:
+            print("DEBUG: Ошибка при парсинге JSON:", e)
+            await message.answer("❌ Xatolik: не удалось прочитать данные от сервера.")
+            return
+        if not groups:
+            await message.answer("📭 Guruhlar topilmadi")
+            return
+        pprint.pprint(groups)
+
+    except Exception as e:
+        print("DEBUG: Ошибка при запросе к API:", e)
+        await message.answer(f"❌ Xatolik yuz berdi:\n{e}")
+        return
+    text = "👥 <b>Sizning guruhlaringiz:</b>\n\n"
+    buttons = []
+    for index, group in enumerate(groups, start=1):
+        group_name = group.get("name", "Noma'lum")
+        students_num = group.get("students_num", 0)
+        price = group.get("price", 0)
+        subject_name = group.get("subject", {}).get("name", "—")
+        teacher = group.get("teacher", {})
+        teacher_name = f"{teacher.get('name', '')} {teacher.get('surname', '')}".strip()
+        text += (
+            f"{index}️⃣ <b>{group_name}</b>\n"
+            f"📚 Fan: <i>{subject_name}</i>\n"
+            f"👨‍🏫 O‘qituvchi: {teacher_name}\n"
+            f"👨‍🎓 O‘quvchilar: {students_num} ta\n"
+            f"💵 Narx: {price:,} so‘m\n"
+            f"{'━' * 22}\n\n"
+        )
+        buttons.append(
+            InlineKeyboardButton(
+                text=f"{index}️⃣ Guruh",
+                callback_data=f"group_open:{group.get('id', 0)}"
+            )
+        )
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[buttons[i:i + 3] for i in range(0, len(buttons), 3)]
+    )
+    await message.answer(text, parse_mode="HTML", reply_markup=keyboard)

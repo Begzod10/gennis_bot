@@ -8,17 +8,18 @@ teacher_basic_reply_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text="👤 Mening hisobim"),
-            KeyboardButton(text="📚 Darslar ro‘yhati"),
+            KeyboardButton(text="💳 Oyliklar ro‘yhati")
+
         ],
         [
+            KeyboardButton(text="📚 Darslar ro‘yhati"),
+            KeyboardButton(text="🎯 Test natijalari")
 
-            KeyboardButton(text="💳 Oyliklar ro‘yhati"),
-            KeyboardButton(text="🚪 Chiqish"),
-        ]
-        # [
-        #     KeyboardButton(text="📝 Davomatlar ro‘yhati"),
-        #     KeyboardButton(text="🎯 Test natijalari"),
-        # ],
+        ],
+        [
+            KeyboardButton(text="👥 Guruhlar"),
+            KeyboardButton(text="🚪 Chiqish")
+        ],
     ],
     resize_keyboard=True,
     input_field_placeholder="👆 Birini tanlang!"

@@ -18,11 +18,13 @@ async def safe_get(url, **kwargs):
     return await asyncio.to_thread(_get)
 
 
-async def safe_post(url, json_payload=None, **kwargs):
+def safe_post(url, json_payload=None, **kwargs):
     def _post():
+        if 'json' in kwargs:
+            kwargs.pop('json')
         return requests.post(url, json=json_payload, timeout=kwargs.pop("timeout", 10), **kwargs)
 
-    return await asyncio.to_thread(_post)
+    return asyncio.to_thread(_post)
 
 
 def get_platform_id(telegram_id: int) -> Optional[int]:

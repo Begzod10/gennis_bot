@@ -6,9 +6,9 @@ from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 import redis.asyncio as redis
 
-
 from app.handlers import router
 from app.student.handlers import student_router
+from app.teacher.attendance import teacher_callbacks
 from app.teacher.handlers import teacher_router
 from app.parent.handlers import parent_router
 from app.user.handlers import user_router
@@ -36,10 +36,12 @@ async def main():
     dp.include_router(student_router)
     dp.include_router(teacher_router)
     dp.include_router(parent_router)
+    dp.include_router(teacher_callbacks)
 
     # Start polling
     await dp.start_polling(bot)
 
+print(API)
 
 if __name__ == "__main__":
     try:

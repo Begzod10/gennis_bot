@@ -15,6 +15,7 @@ def process_login_task(telegram_id, username, password):
     print('task ishladi')
     import requests
     api = os.getenv('API')
+    print(api)
     response = requests.post(f"{api}/api/base/login", json={
         "username": username,
         "password": password
