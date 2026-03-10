@@ -14,6 +14,7 @@ class LoginStates(StatesGroup):
 
 
 class TestStates(StatesGroup):
+    selecting_test = State()
     question_number = State()
     score = State()
     questions = State()

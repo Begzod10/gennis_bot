@@ -314,12 +314,14 @@ async def show_tests(message: types.Message, state: FSMContext):
     buttons.append([types.KeyboardButton(text="⬅️ Orqaga")])
     keyboard = types.ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)
     await state.update_data(tests=available_tests)
+    await state.set_state(TestStates.selecting_test)
     await message.answer("📋 Iltimos, testni tanlang:", reply_markup=keyboard)
 
 
-@student_router.message(StateFilter(None))
+@student_router.message(TestStates.selecting_test)
 async def select_test(message: types.Message, state: FSMContext):
     if message.text in ("⬅️ Orqaga", "📊 Natijalarni ko'rish", "🏁 Testni boshlash", "ℹ️ Yordam"):
+        await state.clear()
         if message.text == "⬅️ Orqaga":
             await message.answer("👆 Iltimos, quyidagilardan birini tanlang:",
                                  reply_markup=student_basic_reply_keyboard_test_type)
