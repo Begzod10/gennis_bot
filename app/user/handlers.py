@@ -37,19 +37,22 @@ async def exit(message: Message, state: FSMContext):
     await message.answer("Siz tizimdan chiqdingiz!", reply_markup=kb.login_keyboard)
 
 
-@user_router.message(F.text == "📚 Darslar ro‘yhati")
+@user_router.message(F.text == "📚 Darslar ro'yhati")
 async def get_darslar_royxati(message: Message):
     api = os.getenv('API')
     telegram_user = message.from_user
     telegram_id = telegram_user.id
     get_user, teacher, student, parent = get_user_data(telegram_id)
+    if not get_user:
+        await message.answer("❌ Foydalanuvchi topilmadi.")
+        return
     if get_user.user_type == 'parent' or get_user.user_type == 'student':
         platform_id = student.platform_id
     elif get_user.user_type == 'teacher':
         platform_id = teacher.platform_id
     else:
         platform_id = None
-    response = requests.get(f'{api}/api/bot/users/time_table/{platform_id}/{get_user.user_type}')
+    response = requests.get(f'{api}/api/bot/users/time_table/{platform_id}/{get_user.user_type}', timeout=10)
     tables = response.json()['table_list']
     if not tables:
         await message.answer("⚠️ Jadval topilmadi.")
@@ -82,13 +85,16 @@ async def get_balance(message: Message):
     telegram_user = message.from_user
     telegram_id = telegram_user.id
     get_user, teacher, student, parent = get_user_data(telegram_id)
+    if not get_user:
+        await message.answer("❌ Foydalanuvchi topilmadi.")
+        return
     if get_user.user_type == 'parent' or get_user.user_type == 'student':
         platform_id = student.platform_id
     elif get_user.user_type == 'teacher':
         platform_id = teacher.platform_id
     else:
         platform_id = None
-    response = requests.get(f'{api}/api/bot/users/balance/{platform_id}/{get_user.user_type}')
+    response = requests.get(f'{api}/api/bot/users/balance/{platform_id}/{get_user.user_type}', timeout=10)
     balance = response.json()['balance']
     if get_user.user_type == 'student':
         await message.answer(f"✅ Sizning hisobingiz: {balance} so'm")
@@ -105,7 +111,10 @@ async def back(message: Message, state: FSMContext):
     telegram_id = telegram_user.id
     current_state = await state.get_state()
     get_user, teacher, student, parent = get_user_data(telegram_id)
-    requests.get(f'{api}/api/bot/users/telegram_id/{get_user.platform_id}/{get_user.telegram_id}')
+    if not get_user:
+        await message.answer("❌ Foydalanuvchi topilmadi.")
+        return
+    requests.get(f'{api}/api/bot/users/telegram_id/{get_user.platform_id}/{get_user.telegram_id}', timeout=10)
     reply = None
     if get_user.user_type == 'parent':
         if current_state == MenuStates.attendances:

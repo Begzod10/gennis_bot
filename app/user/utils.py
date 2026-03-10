@@ -10,6 +10,8 @@ def get_user_data(telegram_id):
     value = redis_client.get(f"parent:{telegram_id}:selected_student")
     with SessionLocal() as session:
         get_user = session.query(User).filter(User.telegram_id == telegram_id).first()
+        if not get_user:
+            return None, None, None, None
         teacher = session.query(Teacher).filter(Teacher.user_id == get_user.id).first()
         if not value:
             student = session.query(Student).filter(Student.user_id == get_user.id).first()

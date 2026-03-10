@@ -167,7 +167,7 @@ def send_balance_to_users():
                                 text += format_ball_history(ball_history)
                                 await bot.send_message(chat_id=user.telegram_id, text=text, reply_markup=keyboard)
                             else:  # parent
-                                get_parent = SessionLocal().query(Parent).filter(Parent.user_id == user.id).first()
+                                get_parent = session.query(Parent).filter(Parent.user_id == user.id).first()
                                 reply_keyboard = generate_student_keyboard_for_parent(get_parent, user.telegram_id)
                                 student_list = data.get('student_list', [])
                                 for student in student_list:

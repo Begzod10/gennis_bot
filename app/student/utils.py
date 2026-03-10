@@ -10,6 +10,8 @@ def get_student(telegram_id):
     with SessionLocal() as session:
         if not value:
             get_user = session.query(User).filter(User.telegram_id == telegram_id).first()
+            if not get_user:
+                return None
             student = session.query(Student).filter(Student.user_id == get_user.id).first()
         else:
             data = json.loads(value)

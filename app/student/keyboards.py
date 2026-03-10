@@ -3,8 +3,6 @@ import json
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-
 student_basic_reply_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [

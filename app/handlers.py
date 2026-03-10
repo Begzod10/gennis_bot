@@ -81,7 +81,8 @@ async def get_password(message: Message, state: FSMContext):
         elif result['user_type'] == 'student':
             reply_keyboard = student_basic_reply_keyboard
         elif result['user_type'] == 'parent':
-            get_parent = SessionLocal().query(Parent).filter(Parent.id == result['parent']).first()
+            with SessionLocal() as _session:
+                get_parent = _session.query(Parent).filter(Parent.id == result['parent']).first()
             reply_keyboard = generate_student_keyboard_for_parent(get_parent, telegram_id)
 
             await state.set_state(MenuStates.menu)
