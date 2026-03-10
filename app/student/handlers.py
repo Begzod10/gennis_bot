@@ -39,7 +39,7 @@ QUESTION_TIME = 15
 async def get_payments_list(message: Message, state: FSMContext):
     print(f"[DEBUG] get_payments_list triggered by {message.from_user.id}, text={repr(message.text)}")
     try:
-        api = os.getenv(‘API’)
+        api = os.getenv("API")
         telegram_user = message.from_user
         telegram_id = telegram_user.id
 
@@ -49,24 +49,23 @@ async def get_payments_list(message: Message, state: FSMContext):
         if not student:
             await message.answer("❌ O’quvchi topilmadi.")
             return
-        response = requests.get(f’{api}/api/bot/students/payments/{student.platform_id}’, timeout=10)
+        response = requests.get(f"{api}/api/bot/students/payments/{student.platform_id}", timeout=10)
         print(f"[DEBUG] payments API status={response.status_code}")
-        payments = response.json().get(‘payments’, [])
+        payments = response.json().get("payments", [])
 
         if not payments:
             await message.answer("⚠️ To’lovlar topilmadi.")
             return
 
-        # Build a table-like message
         text = f"📋 <b>{student.name}, so’nggi to’lovlar ro’yxati:</b>\n\n"
         text += "{:<15} {:<12} {:<10}\n".format("Sana", "Miqdor", "Turi")
         text += "-" * 40 + "\n"
 
         for pay in payments:
             text += "{:<5} {:<12} {:<10}\n".format(
-                pay[‘date’],
-                pay[‘amount’],
-                pay[‘payment_type’]
+                pay["date"],
+                pay["amount"],
+                pay["payment_type"]
             )
 
         text += "\n⬆️ Qo’shimcha savollar uchun adminlarimizga murojaat qiling."
