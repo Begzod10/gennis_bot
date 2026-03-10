@@ -37,7 +37,7 @@ async def exit(message: Message, state: FSMContext):
     await message.answer("Siz tizimdan chiqdingiz!", reply_markup=kb.login_keyboard)
 
 
-@user_router.message(F.text == "📚 Darslar ro'yhati")
+@user_router.message(F.text == "📚 Darslar ro‘yhati")
 async def get_darslar_royxati(message: Message):
     api = os.getenv('API')
     telegram_user = message.from_user

@@ -35,7 +35,7 @@ QUESTION_TIME = 15
 
 
 
-@student_router.message(F.text == "💳 To'lovlar ro'yhati")
+@student_router.message(F.text == "💳 To‘lovlar ro‘yhati")
 async def get_payments_list(message: Message):
     api = os.getenv('API')
     telegram_user = message.from_user
@@ -547,7 +547,7 @@ async def finish_test(message: types.Message, state: FSMContext):
     await state.clear()
 
 
-@student_router.message(F.text == "📝 Davomatlar ro'yhati")
+@student_router.message(F.text == "📝 Davomatlar ro‘yhati")
 async def get_davomatlar_royxati(message: Message, state: FSMContext):
     api = os.getenv('API')
     await state.set_state(MenuStates.attendances)
