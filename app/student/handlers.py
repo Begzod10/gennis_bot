@@ -35,12 +35,13 @@ QUESTION_TIME = 15
 
 
 
-@student_router.message(F.text == "💳 To‘lovlar ro‘yhati")
-async def get_payments_list(message: Message):
+@student_router.message(StateFilter("*"), F.text == "💳 To’lovlar ro’yhati")
+async def get_payments_list(message: Message, state: FSMContext):
     api = os.getenv('API')
     telegram_user = message.from_user
     telegram_id = telegram_user.id
 
+    await state.clear()
     student = get_student(telegram_id)
     if not student:
         await message.answer("❌ O'quvchi topilmadi.")
