@@ -1,6 +1,6 @@
 # app/student/models.py
 
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Integer, String, Float, DateTime, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
 from app.db import Base
@@ -77,4 +77,4 @@ class TestResult(Base):
     score: Mapped[int] = mapped_column(Integer)
     total: Mapped[int] = mapped_column(Integer)
     percent: Mapped[float] = mapped_column(Float)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

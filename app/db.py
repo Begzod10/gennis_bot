@@ -7,6 +7,6 @@ from dotenv import load_dotenv
 load_dotenv()
 DATABASE_URL = os.getenv("SQLALCHEMY_DATABASE_URI")
 
-engine = create_engine(DATABASE_URL, echo=True)  # echo=True for debug
+engine = create_engine(DATABASE_URL, echo=os.getenv("SQLALCHEMY_ECHO", "false").lower() == "true")
 Base = declarative_base()
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

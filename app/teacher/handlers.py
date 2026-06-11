@@ -1,103 +1,127 @@
-from aiogram import F
-import pprint
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, Message, CallbackQuery
+import logging
+import os
+
 import requests
-from aiogram import F
-from aiogram import Router
+from aiogram import F, Router
+from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
+from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
+from dotenv import load_dotenv
+
 from app.db import SessionLocal
 from app.models import User, Teacher
-from .keyboards import teacher_years_keyboard
-import os
-from dotenv import load_dotenv
 from app.states import MenuStates
+from .keyboards import teacher_years_keyboard
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 teacher_router = Router()
-teacher_years_data = {}
-selected_year = {}
 
 
-@teacher_router.message(F.text == "💳 Oyliklar ro‘yhati")
+@teacher_router.message(F.text == "💳 Oyliklar ro'yhati")
 async def get_oyliklar_royxati(message: Message, state: FSMContext):
     api = os.getenv('API')
-    telegram_user = message.from_user
-    telegram_id = telegram_user.id
+    telegram_id = message.from_user.id
     await state.set_state(MenuStates.salary)
+
     with SessionLocal() as session:
         get_user = session.query(User).filter(User.telegram_id == telegram_id).first()
+        if not get_user:
+            await message.answer("❌ Foydalanuvchi topilmadi.")
+            return
         teacher = session.query(Teacher).filter(Teacher.user_id == get_user.id).first()
+        if not teacher:
+            await message.answer("❌ O'qituvchi ma'lumotlari topilmadi.")
+            return
+        teacher_platform_id = teacher.platform_id
 
-        response = requests.get(f'{api}/api/bot/teachers/salary/years/{teacher.platform_id}')
+    try:
+        response = requests.get(
+            f'{api}/api/bot/teachers/salary/years/{teacher_platform_id}',
+            timeout=10
+        )
+        response.raise_for_status()
         data = response.json()
+    except (requests.RequestException, ValueError) as e:
+        logger.error("Failed to fetch salary years: %s", e)
+        await message.answer("❌ Ma'lumotlarni olishda xatolik.")
+        return
 
-        years = data.get('years', [])
-        teacher_years_data[telegram_id] = years
-
+    years = data.get('years', [])
+    await state.update_data(teacher_years=years, teacher_platform_id=teacher_platform_id)
     await message.answer("✅ Yilni tanlang:", reply_markup=await teacher_years_keyboard(years))
 
 
-@teacher_router.message(lambda message: message.text.strip() in teacher_years_data.get(message.from_user.id, []))
-async def handle_dynamic_year_selection(message: Message):
+@teacher_router.message(StateFilter(MenuStates.salary))
+async def handle_dynamic_year_selection(message: Message, state: FSMContext):
     api = os.getenv('API')
     telegram_id = message.from_user.id
     year = message.text.strip()
+
+    data = await state.get_data()
+    years = data.get('teacher_years', [])
+    teacher_platform_id = data.get('teacher_platform_id')
+
+    if year not in years:
+        return
+
+    if not teacher_platform_id:
+        await message.answer("❌ O'qituvchi ma'lumotlari topilmadi.")
+        return
+
     await message.answer(f"✅ Siz {year} yilni tanladingiz!")
-    selected_year[telegram_id] = year
+    await state.update_data(selected_teacher_year=year)
 
-    with SessionLocal() as session:
-        get_user = session.query(User).filter(User.telegram_id == telegram_id).first()
-        teacher = session.query(Teacher).filter(Teacher.user_id == get_user.id).first()
-
-        response = requests.get(f'{api}/api/bot/teachers/salary/{teacher.platform_id}/{year}')
-        data = response.json()
-
-        if not data or not data[0].get('salary_list'):
-            await message.answer("⚠️ Bu yil uchun oylik ma'lumotlari topilmadi.")
-            return
-
-        teacher_info = data[0]
-        salary_list = teacher_info['salary_list']
-
-        full_name = f"{teacher_info['name']} {teacher_info['surname']}"
-        location = teacher_info['location']
-        year = teacher_info['year']
-
-        text = (
-            f"👨‍🏫 <b>O'qituvchi:</b> {full_name}\n"
-            f"📍 <b>Filial:</b> {location}\n"
-            f"📅 <b>Yil:</b> {year}\n\n"
-            f"<b>🧾 Oylik ma'lumotlari:</b>\n\n"
+    try:
+        response = requests.get(
+            f'{api}/api/bot/teachers/salary/{teacher_platform_id}/{year}',
+            timeout=10
         )
-        await message.answer(text, parse_mode="HTML")
-        for item in salary_list:
-            debt = item['debt'] if item['debt'] is not None else 0
-            month = item['month']
-            taken_money = item['taken_money'] if item['taken_money'] is not None else 0
-            # Build message text
-            text = (
-                f"🗓 <b>{month}</b>\n"
-                f"💰 Umumiy oylik: <b>{item['total_salary']:,} so'm</b>\n"
-                f"✅ Olingan: <b>{taken_money:,} so'm</b>\n"
-                f"❗ Qolgan: <b>{item['remaining_salary']:,} so'm</b>\n"
-                f"💳 Qarz: <b>{debt:,} so'm</b>\n"
-                f"🖤 Black Salary: <b>{item['black_salary']:,} so'm</b>\n"
-            )
+        response.raise_for_status()
+        data_resp = response.json()
+    except (requests.RequestException, ValueError) as e:
+        logger.error("Failed to fetch salary data: %s", e)
+        await message.answer("❌ Ma'lumotlarni olishda xatolik.")
+        return
 
-            # Create inline keyboard with callback data
+    if not data_resp or not data_resp[0].get('salary_list'):
+        await message.answer("⚠️ Bu yil uchun oylik ma'lumotlari topilmadi.")
+        return
 
-            keyboard = InlineKeyboardMarkup(
-                inline_keyboard=[
-                    [
-                        InlineKeyboardButton(
-                            text="📄 Batafsil ko‘rish",
-                            callback_data=f"detail:{teacher.platform_id}:{item['id']}:{month}"
-                        )
-                    ]
-                ]
-            )
+    teacher_info = data_resp[0]
+    salary_list = teacher_info['salary_list']
+    full_name = f"{teacher_info['name']} {teacher_info['surname']}"
+    location = teacher_info['location']
 
-            await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
+    text = (
+        f"👨‍🏫 <b>O'qituvchi:</b> {full_name}\n"
+        f"📍 <b>Filial:</b> {location}\n"
+        f"📅 <b>Yil:</b> {year}\n\n"
+        f"<b>🧾 Oylik ma'lumotlari:</b>\n\n"
+    )
+    await message.answer(text, parse_mode="HTML")
+
+    for item in salary_list:
+        debt = item['debt'] if item['debt'] is not None else 0
+        month = item['month']
+        taken_money = item['taken_money'] if item['taken_money'] is not None else 0
+        text = (
+            f"🗓 <b>{month}</b>\n"
+            f"💰 Umumiy oylik: <b>{item['total_salary']:,} so'm</b>\n"
+            f"✅ Olingan: <b>{taken_money:,} so'm</b>\n"
+            f"❗ Qolgan: <b>{item['remaining_salary']:,} so'm</b>\n"
+            f"💳 Qarz: <b>{debt:,} so'm</b>\n"
+            f"🖤 Black Salary: <b>{item['black_salary']:,} so'm</b>\n"
+        )
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[[
+                InlineKeyboardButton(
+                    text="📄 Batafsil ko'rish",
+                    callback_data=f"detail:{teacher_platform_id}:{item['id']}:{month}"
+                )
+            ]]
+        )
+        await message.answer(text, parse_mode="HTML", reply_markup=keyboard)
 
 
 @teacher_router.callback_query(lambda c: c.data.startswith("detail:"))
@@ -106,14 +130,22 @@ async def handle_click(callback_query: CallbackQuery):
     _, teacher_id, salary_id, month = callback_query.data.split(":")
     await callback_query.answer()
 
-    response = requests.get(f'{api}/api/bot/teachers/salary/details/{teacher_id}/{salary_id}')
-    data = response.json()
+    try:
+        response = requests.get(
+            f'{api}/api/bot/teachers/salary/details/{teacher_id}/{salary_id}',
+            timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+    except (requests.RequestException, ValueError) as e:
+        logger.error("Failed to fetch salary details: %s", e)
+        await callback_query.message.answer("❌ Ma'lumotlarni olishda xatolik.")
+        return
 
     if not data or not isinstance(data, dict) or 'salary_list' not in data:
         await callback_query.message.answer("⚠️ Avans ma'lumotlari topilmadi.")
         return
 
-    # Summary fields
     name = data.get("name", "Noma'lum")
     surname = data.get("surname", "")
     location = data.get("location", "❓")
@@ -128,7 +160,7 @@ async def handle_click(callback_query: CallbackQuery):
     if not salary_list:
         await callback_query.message.answer("⚠️ Avans ma'lumotlari topilmadi.")
         return
-    # Header summary
+
     summary_text = (
         f"👨‍🏫 <b>O'qituvchi:</b> {name} {surname}\n"
         f"📍 <b>Filial:</b> {location}\n"
@@ -141,20 +173,15 @@ async def handle_click(callback_query: CallbackQuery):
         f"{'━' * 25}\n"
         f"🧾 <b>Avanslar tafsiloti:</b>\n\n"
     )
-
     await callback_query.message.answer(summary_text, parse_mode="HTML")
 
-    # Combine all payment details
     payment_text = ""
     for i, item in enumerate(salary_list, start=1):
         amount = item.get('amount', 0)
         date = item.get('date', '❓')
         payment_type = item.get('payment_type', '❓')
         reason = item.get('reason', '❓')
-        type_name = item.get('type_name', '❓')
-
         emoji = "💳" if payment_type == "cash" else "🖱"
-
         payment_text += (
             f"🧾 <b>#{i}</b>\n"
             f"📅 <b>Sana:</b> {date}\n"
@@ -164,10 +191,5 @@ async def handle_click(callback_query: CallbackQuery):
             f"{'━' * 25}\n"
         )
 
-    # Telegram max length = 4096 characters
-    if len(payment_text) > 4000:
-        # Send in chunks if too long
-        for i in range(0, len(payment_text), 4000):
-            await callback_query.message.answer(payment_text[i:i + 4000], parse_mode="HTML")
-    else:
-        await callback_query.message.answer(payment_text, parse_mode="HTML")
+    for i in range(0, len(payment_text), 4000):
+        await callback_query.message.answer(payment_text[i:i + 4000], parse_mode="HTML")

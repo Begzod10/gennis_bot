@@ -1,69 +1,72 @@
-from aiogram.types import Message
-from aiogram import F, Router
-import app.keyboards as kb
-from app.redis_client import redis_client
-from aiogram.fsm.context import FSMContext
+import logging
+import os
 
 import requests
+from aiogram import F, Router
+from aiogram.fsm.context import FSMContext
+from aiogram.types import Message
+from dotenv import load_dotenv
 
+import app.keyboards as kb
+from app.parent.keyboards import generate_student_keyboard_for_parent
+from app.redis_client import redis_client
+from app.states import MenuStates
 from app.student.keyboards import student_basic_reply_keyboard, student_basic_reply_keyboard_for_parent
 from app.teacher.keyboards import teacher_basic_reply_keyboard
-from app.parent.keyboards import generate_student_keyboard_for_parent
-from app.states import MenuStates
 from .utils import get_user_data
-import os
-from dotenv import load_dotenv
-from app.teacher.handlers import selected_year, teacher_years_data
-from app.student.handlers import years_data, dates_info, selected_student_year, selected_student_month, user_mode
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 user_router = Router()
 
 
 @user_router.message(F.text == "🚪 Chiqish")
-async def exit(message: Message, state: FSMContext):
+async def exit_handler(message: Message, state: FSMContext):
     telegram_id = message.from_user.id
     await state.clear()
-    years_data.pop(telegram_id, None)
-    dates_info.pop(telegram_id, None)
-    selected_student_year.pop(telegram_id, None)
-    selected_student_month.pop(telegram_id, None)
-    selected_year.pop(telegram_id, None)
-    teacher_years_data.pop(telegram_id, None)
-    user_mode.pop(telegram_id, None)
-    value = redis_client.get(f"parent:{telegram_id}:selected_student")
-    if value:
-        redis_client.delete(f"parent:{telegram_id}:selected_student")
+    redis_client.delete(f"parent:{telegram_id}:selected_student")
     await message.answer("Siz tizimdan chiqdingiz!", reply_markup=kb.login_keyboard)
 
 
-@user_router.message(F.text == "📚 Darslar ro‘yhati")
+@user_router.message(F.text == "📚 Darslar ro'yhati")
 async def get_darslar_royxati(message: Message):
     api = os.getenv('API')
-    telegram_user = message.from_user
-    telegram_id = telegram_user.id
+    telegram_id = message.from_user.id
     get_user, teacher, student, parent = get_user_data(telegram_id)
     if not get_user:
         await message.answer("❌ Foydalanuvchi topilmadi.")
         return
-    if get_user.user_type == 'parent' or get_user.user_type == 'student':
+
+    if get_user.user_type in ('parent', 'student'):
+        if not student:
+            await message.answer("❌ Iltimos, avval o'quvchini tanlang.")
+            return
         platform_id = student.platform_id
     elif get_user.user_type == 'teacher':
+        if not teacher:
+            await message.answer("❌ O'qituvchi ma'lumotlari topilmadi.")
+            return
         platform_id = teacher.platform_id
     else:
         platform_id = None
-    response = requests.get(f'{api}/api/bot/users/time_table/{platform_id}/{get_user.user_type}', timeout=10)
-    tables = response.json()['table_list']
+
+    try:
+        response = requests.get(
+            f'{api}/api/bot/users/time_table/{platform_id}/{get_user.user_type}',
+            timeout=10
+        )
+        response.raise_for_status()
+        tables = response.json().get('table_list', [])
+    except (requests.RequestException, ValueError) as e:
+        logger.error("Failed to fetch timetable: %s", e)
+        await message.answer("❌ Ma'lumotlarni olishda xatolik.")
+        return
+
     if not tables:
         await message.answer("⚠️ Jadval topilmadi.")
         return
-    if get_user.user_type == 'parent':
-        name = student.name
-    elif get_user.user_type == 'student':
-        name = student.name
-    else:
-        name = get_user.name
 
+    name = student.name if get_user.user_type in ('parent', 'student') else get_user.name
     text = f"📅 <b>{name}, sizning dars jadvalingiz:</b>\n\n"
     for table in tables:
         text += f"🔷 <b>{table['subject']} ({table['name']})</b>\n"
@@ -82,20 +85,37 @@ async def get_darslar_royxati(message: Message):
 @user_router.message(F.text == "👤 Mening hisobim")
 async def get_balance(message: Message):
     api = os.getenv('API')
-    telegram_user = message.from_user
-    telegram_id = telegram_user.id
+    telegram_id = message.from_user.id
     get_user, teacher, student, parent = get_user_data(telegram_id)
     if not get_user:
         await message.answer("❌ Foydalanuvchi topilmadi.")
         return
-    if get_user.user_type == 'parent' or get_user.user_type == 'student':
+
+    if get_user.user_type in ('parent', 'student'):
+        if not student:
+            await message.answer("❌ Iltimos, avval o'quvchini tanlang.")
+            return
         platform_id = student.platform_id
     elif get_user.user_type == 'teacher':
+        if not teacher:
+            await message.answer("❌ O'qituvchi ma'lumotlari topilmadi.")
+            return
         platform_id = teacher.platform_id
     else:
         platform_id = None
-    response = requests.get(f'{api}/api/bot/users/balance/{platform_id}/{get_user.user_type}', timeout=10)
-    balance = response.json()['balance']
+
+    try:
+        response = requests.get(
+            f'{api}/api/bot/users/balance/{platform_id}/{get_user.user_type}',
+            timeout=10
+        )
+        response.raise_for_status()
+        balance = response.json().get('balance')
+    except (requests.RequestException, ValueError) as e:
+        logger.error("Failed to fetch balance: %s", e)
+        await message.answer("❌ Balans ma'lumotlarini olishda xatolik.")
+        return
+
     if get_user.user_type == 'student':
         await message.answer(f"✅ Sizning hisobingiz: {balance} so'm")
     elif get_user.user_type == 'parent':
@@ -106,32 +126,32 @@ async def get_balance(message: Message):
 
 @user_router.message(F.text == "⬅️ Ortga qaytish")
 async def back(message: Message, state: FSMContext):
-    telegram_user = message.from_user
     api = os.getenv('API')
-    telegram_id = telegram_user.id
+    telegram_id = message.from_user.id
     current_state = await state.get_state()
     get_user, teacher, student, parent = get_user_data(telegram_id)
     if not get_user:
         await message.answer("❌ Foydalanuvchi topilmadi.")
         return
-    requests.get(f'{api}/api/bot/users/telegram_id/{get_user.platform_id}/{get_user.telegram_id}', timeout=10)
+
+    try:
+        requests.get(
+            f'{api}/api/bot/users/telegram_id/{get_user.platform_id}/{get_user.telegram_id}',
+            timeout=10
+        )
+    except requests.RequestException as e:
+        logger.warning("Failed to update telegram_id on platform: %s", e)
+
     reply = None
     if get_user.user_type == 'parent':
-        if current_state == MenuStates.attendances:
-            reply = student_basic_reply_keyboard_for_parent
-            await state.set_state(MenuStates.menu)
-        elif current_state == MenuStates.scores:
+        if current_state in (MenuStates.attendances, MenuStates.scores):
             reply = student_basic_reply_keyboard_for_parent
             await state.set_state(MenuStates.menu)
         elif current_state == MenuStates.menu:
-            reply = generate_student_keyboard_for_parent(parent, telegram_id)
+            if parent:
+                reply = generate_student_keyboard_for_parent(parent, telegram_id)
     elif get_user.user_type == 'student':
-        if current_state == MenuStates.attendances:
-            reply = student_basic_reply_keyboard
-        elif current_state == MenuStates.scores:
-            reply = student_basic_reply_keyboard
-        else:
-            reply = student_basic_reply_keyboard
+        reply = student_basic_reply_keyboard
     elif get_user.user_type == 'teacher':
         if current_state == MenuStates.salary:
             reply = teacher_basic_reply_keyboard

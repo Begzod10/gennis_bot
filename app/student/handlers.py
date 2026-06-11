@@ -1,34 +1,31 @@
-from aiogram import F, types
-from aiogram.types import Message, InlineKeyboardButton, InlineKeyboardMarkup
-import requests
 import asyncio
-import pprint
-import functools
-from typing import Optional
 import json
-import time
-from typing import Dict
-from .keyboards import create_years_reply_keyboard, create_months_inline_keyboard, student_basic_reply_keyboard, \
-    student_basic_reply_keyboard_test_type
+import logging
 import os
-from dotenv import load_dotenv
-from aiogram.fsm.context import FSMContext
-from aiogram.fsm.state import StatesGroup, State
-from aiogram import Router
+from typing import Dict, Optional
+
+import requests
+from aiogram import F, Router, types
 from aiogram.filters import StateFilter
-from app.states import MenuStates, TestStates
-from .utils import get_student
-from app.models import TestResult, User
+from aiogram.fsm.context import FSMContext
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
+from dotenv import load_dotenv
+
 from app.db import SessionLocal, Base
+from app.models import TestResult, User
+from app.states import MenuStates, TestStates
+from .keyboards import (
+    create_years_reply_keyboard,
+    create_months_inline_keyboard,
+    student_basic_reply_keyboard,
+    student_basic_reply_keyboard_test_type,
+)
+from .utils import get_student
 
-student_router = Router()
-years_data = {}
-dates_info = {}
-
-selected_student_year = {}
-selected_student_month = {}
-user_mode = {}
 load_dotenv()
+logger = logging.getLogger(__name__)
+student_router = Router()
+
 timer_tasks: Dict[int, asyncio.Task] = {}
 progress_messages: Dict[int, Dict[str, int]] = {}
 QUESTION_TIME = 15
@@ -165,11 +162,11 @@ async def handle_online_test_results(message: Message, state: FSMContext):
         response = requests.get(api_url, timeout=10)
         response.raise_for_status()
         data = response.json()
-    except (requests.RequestException, Exception) as e:
-        await message.answer(f"❌ Xatolik yuz berdi: {e}")
-        return
     except json.JSONDecodeError:
         await message.answer("❌ Xato: server noto'g'ri JSON yubordi.")
+        return
+    except requests.RequestException as e:
+        await message.answer(f"❌ Xatolik yuz berdi: {e}")
         return
     finished_tests = [t for t in data if t.get("finished")]
     if not finished_tests:
@@ -260,14 +257,13 @@ def save_result(user_id, username, score, total, percent):
             username=username or "NoUsername",
             score=score,
             total=total,
-
             percent=percent
         )
         session.add(result)
         session.commit()
     except Exception as e:
         session.rollback()
-        print(f"Error saving results: {e}")
+        logger.error("Error saving test result: %s", e)
     finally:
         session.close()
 
@@ -340,9 +336,8 @@ async def select_test(message: types.Message, state: FSMContext):
     await message.answer(f"✅ Siz tanladingiz: <b>{selected['name']}</b>", parse_mode="HTML")
     await message.answer("🧠 Test yuklanmoqda...", reply_markup=types.ReplyKeyboardRemove())
     test_url = f"https://classroom.gennis.uz/api/pisa/student/get/test_bot/{selected['id']}/{platform_id}"
-    print(selected['id'])
     try:
-        response = requests.get(test_url, timeout=10)
+        response = await safe_get(test_url, timeout=10)
     except Exception as e:
         await message.answer(f"🚫 So'rovda xatolik: {e}")
         return
@@ -518,9 +513,6 @@ async def finish_test(message: types.Message, state: FSMContext):
                 "Content-Type": "application/json"
             }
         )
-        print("[DEBUG] SEND ONE:", answer_object)
-        print("[DEBUG] STATUS:", resp.status_code)
-        print("[DEBUG] RESP:", resp.text)
         if resp.status_code != 200:
             await message.answer(f"⚠️ Xatolik: {resp.status_code}")
             return
@@ -529,7 +521,6 @@ async def finish_test(message: types.Message, state: FSMContext):
         result_resp = await safe_get(show_url)
         result_resp.raise_for_status()
         result_data = result_resp.json()
-        print("[DEBUG] SHOW RESULT:", result_data)
     except Exception as e:
         await message.answer(f"⚠️ Xatolik olishda natijalar: {e}")
         result_data = {}
