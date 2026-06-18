@@ -11,7 +11,11 @@ logger = logging.getLogger(__name__)
 
 
 def get_user_data(telegram_id):
-    value = redis_client.get(f"parent:{telegram_id}:selected_student")
+    try:
+        value = redis_client.get(f"parent:{telegram_id}:selected_student")
+    except Exception as e:
+        logger.error(f"Redis get error: {e}")
+        value = None
     with SessionLocal() as session:
         get_user = session.query(User).filter(User.telegram_id == telegram_id).first()
         if not get_user:
@@ -36,15 +40,21 @@ def get_user_data(telegram_id):
                     "Stale Redis reference for telegram_id=%s: student_id=%s parent_id=%s",
                     telegram_id, student_id, parent_id
                 )
-                redis_client.delete(f"parent:{telegram_id}:selected_student")
+                try:
+                    redis_client.delete(f"parent:{telegram_id}:selected_student")
+                except Exception as e:
+                    logger.error(f"Redis delete error: {e}")
                 student = None
                 parent = None
             else:
-                redis_client.set(
-                    f"parent:{telegram_id}:selected_student",
-                    json.dumps({"student_id": student.id, "parent_id": parent.id}),
-                    ex=600
-                )
+                try:
+                    redis_client.set(
+                        f"parent:{telegram_id}:selected_student",
+                        json.dumps({"student_id": student.id, "parent_id": parent.id}),
+                        ex=600
+                    )
+                except Exception as e:
+                    logger.error(f"Redis set error: {e}")
 
         session.expunge_all()
 

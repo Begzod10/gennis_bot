@@ -81,10 +81,17 @@ def generate_student_keyboard_for_parent(parent: Parent, telegram_id: int) -> Re
         if temp_row:
             buttons.append(temp_row)
 
+    buttons.append([KeyboardButton(
+        text="📊 Ota-ona kabineti (MiniApp)",
+        web_app={"url": f"https://quarry-cabbie-galley.ngrok-free.dev/parent-miniapp.html?id={telegram_id}"}
+    )])
     buttons.append([KeyboardButton(text="🚪 Chiqish")])
 
     if student_map:
-        redis_client.hset(redis_key, mapping=student_map)
-        redis_client.expire(redis_key, 600)
+        try:
+            redis_client.hset(redis_key, mapping=student_map)
+            redis_client.expire(redis_key, 600)
+        except Exception as e:
+            logger.error(f"Redis hset error: {e}")
 
     return ReplyKeyboardMarkup(keyboard=buttons, resize_keyboard=True)

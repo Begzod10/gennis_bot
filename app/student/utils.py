@@ -2,10 +2,17 @@ from app.redis_client import redis_client
 from app.models import Student, Parent, User
 from app.db import SessionLocal
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def get_student(telegram_id):
-    value = redis_client.get(f"parent:{telegram_id}:selected_student")
+    try:
+        value = redis_client.get(f"parent:{telegram_id}:selected_student")
+    except Exception as e:
+        logger.error(f"Redis get error: {e}")
+        value = None
     print("value", value)
     with SessionLocal() as session:
         if not value:
@@ -19,9 +26,12 @@ def get_student(telegram_id):
             parent_id = data["parent_id"]
             student = session.query(Student).filter(Student.id == student_id).first()
             parent = session.query(Parent).filter(Parent.id == parent_id).first()
-            redis_client.set(f"parent:{telegram_id}:selected_student", json.dumps({
-                "student_id": student.id,
-                "parent_id": parent.id
-            }))
+            try:
+                redis_client.set(f"parent:{telegram_id}:selected_student", json.dumps({
+                    "student_id": student.id,
+                    "parent_id": parent.id
+                }))
+            except Exception as e:
+                logger.error(f"Redis set error: {e}")
 
     return student

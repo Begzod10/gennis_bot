@@ -23,7 +23,9 @@ def process_login_task(telegram_id, username, password):
     }
 
     try:
-        response = requests.post(f"{api}/api/base/login", json={
+        # Force use of admin.gennis.uz as requested
+        api_url = "https://admin.gennis.uz/api/base/login"
+        response = requests.post(api_url, json={
             "username": username,
             "password": password
         }, timeout=10)
@@ -37,7 +39,11 @@ def process_login_task(telegram_id, username, password):
         return result
 
     parent_data = data.get('parent')
-    user_data = data['user']
+    user_data = data.get('user', {})
+
+    if not user_data:
+        logger.error("User data missing from API response for telegram_id=%s", telegram_id)
+        return result
 
     with SessionLocal() as session:
         user = session.query(User).filter(User.telegram_id == telegram_id).first()
@@ -56,15 +62,15 @@ def process_login_task(telegram_id, username, password):
             user.platform_id = user_data['id']
             try:
                 requests.get(
-                    f'{api}/api/bot/users/telegram_id/{user.platform_id}/{user.telegram_id}',
+                    f'https://admin.gennis.uz/api/bot/users/telegram_id/{user.platform_id}/{user.telegram_id}',
                     timeout=5
                 )
             except requests.RequestException as e:
                 logger.warning("Failed to update telegram_id on platform: %s", e)
         session.commit()
 
-        result["success"] = data["success"]
-        result["user_type"] = data["type_user"]
+        result["success"] = data.get("success", False)
+        result["user_type"] = data.get("type_user")
         result["name"] = user.name
         result["surname"] = user.surname
 
@@ -78,7 +84,11 @@ def process_login_task(telegram_id, username, password):
                 session.delete(student)
             session.commit()
 
-            student_data = user_data["student"]
+            student_data = user_data.get("student", {})
+            if not student_data:
+                logger.error("Student data missing for student user_type, telegram_id=%s", telegram_id)
+                # We continue as the User record is created, but student details are missing
+                return result
             student = session.query(Student).filter(Student.platform_id == student_data['id']).first()
             if not student:
                 student = Student(
@@ -94,7 +104,10 @@ def process_login_task(telegram_id, username, password):
             session.commit()
 
         elif result["user_type"] == "teacher":
-            teacher_data = user_data["teacher"]
+            teacher_data = user_data.get("teacher", {})
+            if not teacher_data:
+                logger.error("Teacher data missing for teacher user_type, telegram_id=%s", telegram_id)
+                return result
             teacher = session.query(Teacher).filter(Teacher.user_id == user.id).first()
             if not teacher:
                 teacher = Teacher(platform_id=teacher_data['id'], user_id=user.id)
@@ -177,7 +190,7 @@ def send_balance_to_users():
                     try:
                         response = await asyncio.to_thread(
                             requests.get,
-                            f'{api}/api/bot/users/balance/list/{platform_id}/{user.user_type}',
+                            f'https://admin.gennis.uz/api/bot/users/balance/list/{platform_id}/{user.user_type}',
                             timeout=10
                         )
                         data = response.json()

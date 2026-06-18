@@ -25,14 +25,13 @@ API = os.environ["API"]
 async def main():
     session = AiohttpSession(proxy=os.getenv("HTTPS_PROXY"))
     bot = Bot(token=TOKEN, session=session)
+    
+    from app.db import engine, Base
+    import app.models
+    Base.metadata.create_all(bind=engine)
 
-    redis_pool = redis.from_url(
-        f"redis://{os.getenv('REDIS_HOST', 'localhost')}"
-        f":{os.getenv('REDIS_PORT', '6379')}"
-        f"/{os.getenv('REDIS_DB_BOT', '2')}"
-    )
-
-    storage = RedisStorage(redis=redis_pool)
+    from aiogram.fsm.storage.memory import MemoryStorage
+    storage = MemoryStorage()
     dp = Dispatcher(storage=storage)
 
     dp.include_router(router)

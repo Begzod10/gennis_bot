@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ota-ona kabineti</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding-bottom: 70px;
+            color: #111827;
+        }
+        .header {
+            background: #1e1b4b;
+            color: white;
+            padding: 24px 20px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            border-bottom-left-radius: 20px;
+            border-bottom-right-radius: 20px;
+        }
+        .header h1 { font-size: 22px; font-weight: 800; color: #ffffff; margin: 0; }
+        .header p { font-size: 13px; opacity: 0.7; margin-top: 6px; color: #eef2ff; }
+
+        .content { padding: 20px 15px; }
+
+        .card {
+            background: #ffffff;
+            border-radius: 18px;
+            padding: 18px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.03);
+        }
+        .card h3 { margin: 0 0 14px; font-size: 16px; font-weight: 700; color: #1e1b4b; display: flex; align-items: center; gap: 8px; }
+        .card-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .card-row:last-child { border-bottom: none; }
+        .label { color: #64748b; font-size: 13px; font-weight: 500; }
+        .value { color: #1e1b4b; font-weight: 700; font-size: 14px; }
+
+        .badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .badge.green { background: #ecfdf5; color: #059669; }
+        .badge.blue { background: #eff6ff; color: #2563eb; }
+
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .stat-box { 
+            background: #ffffff; 
+            border-radius: 18px; 
+            padding: 20px; 
+            text-align: center; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            border: 1px solid rgba(0,0,0,0.03);
+        }
+        .stat-box .number { font-size: 26px; font-weight: 800; color: #3b82f6; }
+        .stat-box .stat-label { font-size: 12px; color: #64748b; margin-top: 6px; font-weight: 600; }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: #ffffff;
+            display: flex;
+            justify-content: space-around;
+            padding: 12px 0;
+            box-shadow: 0 -4px 15px rgba(0,0,0,0.05);
+            z-index: 1000;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 11px;
+            color: #94a3b8;
+            text-decoration: none;
+            gap: 4px;
+            border: none;
+            background: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .nav-item.active { color: #3b82f6; }
+        .nav-item svg { width: 22px; height: 22px; }
+
+        .tab { display: none; }
+        .tab.active { display: block; animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .spinner-wrap { text-align: center; padding: 40px; color: #64748b; }
+        .spinner {
+            width: 36px; height: 36px;
+            border: 3px solid #e2e8f0;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 12px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .error-box { background: #fef2f2; color: #dc2626; border-radius: 12px; padding: 16px; font-size: 13px; line-height: 1.5; border: 1px solid #fee2e2; }
+        .profile-avatar { width: 90px; height: 90px; border-radius: 50%; background: #1e1b4b; display: flex; align-items: center; justify-content: center; margin: 20px auto 10px; font-size: 40px; color: white; box-shadow: 0 4px 12px rgba(30, 27, 75, 0.2); }
+
+        /* Remove Telegram dark theme overrides to keep it light as requested */
+        @media (prefers-color-scheme: dark) {
+            body { background-color: #f3f4f6; color: #111827; }
+            .card, .stat-box, .bottom-nav { background-color: #ffffff; }
+            .label { color: #64748b; }
+            .value { color: #1e1b4b; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <h1>🌟 Ota-ona kabineti</h1>
+    <p id="headerSub">Yuklanmoqda...</p>
+</div>
+
+<div class="content">
+    <div class="tab active" id="tab-home">
+        <div class="spinner-wrap"><div class="spinner"></div>Ma'lumotlar yuklanmoqda...</div>
+    </div>
+    <div class="tab" id="tab-progress">
+        <div class="spinner-wrap"><div class="spinner"></div>Yuklanmoqda...</div>
+    </div>
+    <div class="tab" id="tab-payments">
+        <div class="spinner-wrap"><div class="spinner"></div>Yuklanmoqda...</div>
+    </div>
+    <div class="tab" id="tab-profile">
+        <div class="card">
+            <div class="profile-avatar">👤</div>
+            <p style="text-align:center;font-size:15px;font-weight:600;color:#2c3e50;margin-top:8px">Ota-ona</p>
+            <p style="text-align:center;font-size:13px;color:#7f8c8d;margin-top:4px" id="profile-id"></p>
+        </div>
+        <div class="card">
+            <h3>⚙️ Sozlamalar</h3>
+            <div class="card-row"><span class="label">Bildirishnomalar</span><span class="badge">Yoqilgan</span></div>
+            <div class="card-row"><span class="label">Til</span><span class="value">O'zbekcha</span></div>
+        </div>
+    </div>
+</div>
+
+<div class="bottom-nav">
+    <button class="nav-item active" onclick="switchTab('home',this)">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+        Asosiy
+    </button>
+    <button class="nav-item" onclick="switchTab('progress',this)">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+        Natijalar
+    </button>
+    <button class="nav-item" onclick="switchTab('payments',this)">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+        To'lovlar
+    </button>
+    <button class="nav-item" onclick="switchTab('profile',this)">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        Profil
+    </button>
+</div>
+
+<script>
+    function switchTab(name, btn) {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+        document.getElementById('tab-' + name).classList.add('active');
+        btn.classList.add('active');
+    }
+
+    // Read telegram_id from query param: ?id=123456
+    const params = new URLSearchParams(window.location.search);
+    const telegramId = params.get('id') || '';
+
+    document.getElementById('profile-id').textContent = telegramId ? ('Telegram ID: ' + telegramId) : 'ID topilmadi';
+
+    // Backend via ngrok (port 8000)
+    const API = 'https://quarry-cabbie-galley.ngrok-free.dev/api/v1';
+
+    function showError(tabId, msg) {
+        document.getElementById(tabId).innerHTML = '<div class="error-box">⚠️ ' + msg + '</div>';
+    }
+
+    function renderHome(data) {
+        const ch = data.children || [];
+        if (!ch.length) { document.getElementById('tab-home').innerHTML = '<div class="spinner-wrap">Farzandlar topilmadi</div>'; return; }
+        
+        let totalCompleted = ch.reduce((a,c)=>a+(c.completed_courses||[]).length,0);
+        let totalPoints = ch.reduce((a,c)=>a+(c.points||0),0);
+
+        let h = '<div class="stat-grid">' +
+            '<div class="stat-box"><div class="number">' + ch.length + '</div><div class="stat-label">Farzandlar</div></div>' +
+            '<div class="stat-box"><div class="number">' + totalPoints + '</div><div class="stat-label">Umumiy ball</div></div>' +
+            '</div>';
+            
+        ch.forEach(c => {
+            h += '<div class="card"><h3>👦 ' + c.name + '</h3>' +
+                 '<div class="card-row"><span class="label">Platform Daraja:</span><span class="value">' + (c.level || 'Beginner') + '</span></div>' +
+                 '<div class="card-row"><span class="label">Gennis Guruh:</span><span class="value">' + (c.gennis_group || 'Yuklanmoqda...') + '</span></div>' +
+                 '<div class="card-row"><span class="label">Sertifikatlar:</span><span class="badge green">' + (c.completed_courses||[]).length + ' ta</span></div>' +
+                 '</div>';
+        });
+        document.getElementById('tab-home').innerHTML = h;
+        document.getElementById('headerSub').textContent = 'Farzandlar monitoringi';
+    }
+
+    function renderProgress(data) {
+        const ch = data.children || [];
+        if (!ch.length) { document.getElementById('tab-progress').innerHTML = '<div class="spinner-wrap">Ma\'lumot topilmadi</div>'; return; }
+        
+        let h = '';
+        ch.forEach(c => {
+            h += '<div class="card"><h3>⭐ ' + c.name + '</h3>' +
+                 '<div class="card-row"><strong>Joriy ball:</strong><span class="value" style="font-size:18px; color:#3b82f6;">' + (c.points || 0) + '</span></div>' +
+                 '<div class="card-row"><strong>Daraja:</strong><span class="badge blue">' + (c.level || 'Beginner') + '</span></div>';
+            
+            h += '<div style="margin-top:12px; font-size:13px; color:#666;">Joriy kurslar:</div>';
+            const active = c.active_courses || [];
+            if (active.length > 0) {
+                active.forEach(k => {
+                    h += '<div class="card-row" style="background:#f8fafc; padding:8px; border-radius:8px; margin-top:4px;">' +
+                         '<span>📘 ' + k.title + '</span></div>';
+                });
+            } else {
+                h += '<div class="card-row"><span>Kurslar topilmadi</span></div>';
+            }
+            h += '</div>';
+        });
+        document.getElementById('tab-progress').innerHTML = h;
+    }
+
+    let globalAttendance = {}; 
+
+    function renderPayments(payData) {
+        const ch = payData.children || [];
+        if (!ch.length) { document.getElementById('tab-payments').innerHTML = '<div class="spinner-wrap">Ma\'lumot topilmadi</div>'; return; }
+        
+        let h = '';
+        ch.forEach(c => {
+            const balance = c.balance || 0;
+            const lessonPrice = 430000 / 12;
+            const lessonsLeft = Math.floor(balance / lessonPrice);
+            const statusColor = balance < 0 ? '#ef4444' : '#10b981';
+
+            h += '<div class="card"><h3>💰 ' + c.name + '</h3>';
+            h += '<div class="stat-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:15px;">' +
+                 '<div class="stat-box" style="padding:10px;"><div class="number" style="color:'+statusColor+'; font-size:18px;">' + balance.toLocaleString() + '</div><div class="stat-label">Balans (so\'m)</div></div>' +
+                 '<div class="stat-box" style="padding:10px;"><div class="number" style="font-size:18px;">' + (lessonsLeft > 0 ? lessonsLeft : 0) + '</div><div class="stat-label">Dars qoldi</div></div>' +
+                 '</div>';
+
+            // Attendance Table
+            h += '<div style="margin-top:15px; margin-bottom:8px; font-weight:700; font-size:13px;">📅 Davomat tarixi (Oxirgi darslar)</div>';
+            h += '<div style="overflow-x:auto; background:#f9fafb; border-radius:10px; padding:10px;">' +
+                 '<table style="width:100%; border-collapse:collapse; font-size:12px;">' +
+                 '<thead><tr style="border-bottom:1px solid #eee;">';
+            
+            const att = (globalAttendance.children || []).find(a => a.name === c.name) || {};
+            const dates = (att.attendance ? (att.attendance.dates || Object.keys(att.attendance)) : []).slice(-7).reverse();
+
+            if (dates.length > 0) {
+                dates.forEach(d => { h += '<th style="padding:4px; text-align:center;">' + d.split('-').slice(1).join('/') + '</th>'; });
+                h += '</tr></thead><tbody><tr>';
+                dates.forEach(() => { h += '<td style="padding:8px; text-align:center; color:#10b981;">✅</td>'; });
+                h += '</tr></tbody></table></div>';
+            } else {
+                h += '<div style="font-size:12px; color:#999; padding:10px; text-align:center;">Davomat ma\'lumoti yo\'q</div>';
+            }
+
+            // Payment History
+            h += '<div style="margin-top:15px; margin-bottom:8px; font-weight:700; font-size:13px;">💳 To\'lovlar tarixim</div>';
+            const payments = c.payments || [];
+            if (payments.length > 0) {
+                payments.slice(0,5).forEach(p => {
+                    h += '<div class="card-row" style="padding:6px 0; border-bottom:1px solid #f1f5f9;">' +
+                         '<span class="label" style="font-size:12px;">' + (p.date || '—') + '</span>' +
+                         '<span class="value" style="font-size:12px; font-weight:600; color:#10b981;">+' + (p.amount ? p.amount.toLocaleString() : '0') + '</span></div>';
+                });
+            } else {
+                h += '<div style="font-size:12px; color:#999; padding:5px 0;">To\'lovlar topilmadi</div>';
+            }
+            h += '</div>';
+        });
+        document.getElementById('tab-payments').innerHTML = h;
+    }
+
+    async function loadData() {
+        if (!telegramId) {
+            ['home','progress','payments'].forEach(id => showError('tab-'+id, 'ID topilmadi'));
+            return;
+        }
+        
+        const fetchConfig = { headers: { 'ngrok-skip-browser-warning': 'true', 'bypass-tunnel-reminder': 'true' } };
+
+        try {
+            // First load attendance to be shared
+            const attRes = await fetch(API + '/parent/attendance/' + telegramId, fetchConfig);
+            if (attRes.ok) globalAttendance = await attRes.json();
+
+            // Load Progress
+            const progRes = await fetch(API + '/parent/progress/' + telegramId, fetchConfig);
+            if (progRes.ok) {
+                const data = await progRes.json();
+                renderHome(data);
+                renderProgress(data);
+            } else throw new Error('Progress load failed');
+
+            // Load Payments
+            const payRes = await fetch(API + '/parent/payments/' + telegramId, fetchConfig);
+            if (payRes.ok) {
+                renderPayments(await payRes.json());
+            } else throw new Error('Payments load failed');
+
+        } catch(e) { 
+            console.error(e);
+            ['tab-home','tab-progress','tab-payments'].forEach(id => showError(id, 'Ma\'lumot yuklashda xatolik'));
+        }
+    }
+
+    loadData();
+</script>
+</body>
+</html>
