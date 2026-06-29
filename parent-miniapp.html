@@ -4,12 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Ota-ona kabineti</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body {
             font-family: 'Inter', -apple-system, sans-serif;
             background-color: #f3f4f6;
-            margin: 0;
             padding-bottom: 70px;
             color: #111827;
         }
@@ -59,13 +59,14 @@
         }
         .badge.green { background: #ecfdf5; color: #059669; }
         .badge.blue { background: #eff6ff; color: #2563eb; }
+        .badge.red { background: #fef2f2; color: #dc2626; }
 
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-        .stat-box { 
-            background: #ffffff; 
-            border-radius: 18px; 
-            padding: 20px; 
-            text-align: center; 
+        .stat-box {
+            background: #ffffff;
+            border-radius: 18px;
+            padding: 20px;
+            text-align: center;
             box-shadow: 0 4px 15px rgba(0,0,0,0.05);
             border: 1px solid rgba(0,0,0,0.03);
         }
@@ -95,7 +96,8 @@
             border: none;
             background: none;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: color 0.2s;
+            padding: 4px 8px;
         }
         .nav-item.active { color: #3b82f6; }
         .nav-item svg { width: 22px; height: 22px; }
@@ -115,14 +117,14 @@
         }
         @keyframes spin { to { transform: rotate(360deg); } }
         .error-box { background: #fef2f2; color: #dc2626; border-radius: 12px; padding: 16px; font-size: 13px; line-height: 1.5; border: 1px solid #fee2e2; }
-        .profile-avatar { width: 90px; height: 90px; border-radius: 50%; background: #1e1b4b; display: flex; align-items: center; justify-content: center; margin: 20px auto 10px; font-size: 40px; color: white; box-shadow: 0 4px 12px rgba(30, 27, 75, 0.2); }
+        .profile-avatar { width: 90px; height: 90px; border-radius: 50%; background: #1e1b4b; display: flex; align-items: center; justify-content: center; margin: 20px auto 10px; font-size: 40px; color: white; }
 
-        /* Remove Telegram dark theme overrides to keep it light as requested */
+        .att-present { color: #059669; font-size: 16px; }
+        .att-absent { color: #dc2626; font-size: 16px; }
+
         @media (prefers-color-scheme: dark) {
             body { background-color: #f3f4f6; color: #111827; }
             .card, .stat-box, .bottom-nav { background-color: #ffffff; }
-            .label { color: #64748b; }
-            .value { color: #1e1b4b; }
         }
     </style>
 </head>
@@ -146,12 +148,12 @@
     <div class="tab" id="tab-profile">
         <div class="card">
             <div class="profile-avatar">👤</div>
-            <p style="text-align:center;font-size:15px;font-weight:600;color:#2c3e50;margin-top:8px">Ota-ona</p>
+            <p style="text-align:center;font-size:15px;font-weight:600;color:#2c3e50;margin-top:8px" id="profile-name">Ota-ona</p>
             <p style="text-align:center;font-size:13px;color:#7f8c8d;margin-top:4px" id="profile-id"></p>
         </div>
         <div class="card">
             <h3>⚙️ Sozlamalar</h3>
-            <div class="card-row"><span class="label">Bildirishnomalar</span><span class="badge">Yoqilgan</span></div>
+            <div class="card-row"><span class="label">Bildirishnomalar</span><span class="badge green">Yoqilgan</span></div>
             <div class="card-row"><span class="label">Til</span><span class="value">O'zbekcha</span></div>
         </div>
     </div>
@@ -177,6 +179,26 @@
 </div>
 
 <script>
+    // ── Config ─────────────────────────────────────────────────────────────
+    // Change this to the production student_platform URL before deploying.
+    const API = 'https://tech.gennis.uz/api/v1';
+
+    // ── Telegram WebApp ────────────────────────────────────────────────────
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    const tgUser = tg.initDataUnsafe?.user || {};
+    const tgName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ') || 'Ota-ona';
+
+    document.getElementById('profile-name').textContent = tgName;
+    document.getElementById('profile-id').textContent = tgUser.id ? `Telegram ID: ${tgUser.id}` : '';
+
+    // ── Parent Gennis ID from URL ───────────────────────────────────────────
+    const params = new URLSearchParams(window.location.search);
+    const parentId = params.get('parent_id') || '';
+
+    // ── Tab switching ──────────────────────────────────────────────────────
     function switchTab(name, btn) {
         document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
         document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
@@ -184,151 +206,164 @@
         btn.classList.add('active');
     }
 
-    // Read telegram_id from query param: ?id=123456
-    const params = new URLSearchParams(window.location.search);
-    const telegramId = params.get('id') || '';
-
-    document.getElementById('profile-id').textContent = telegramId ? ('Telegram ID: ' + telegramId) : 'ID topilmadi';
-
-    // Backend via ngrok (port 8000)
-    const API = 'https://quarry-cabbie-galley.ngrok-free.dev/api/v1';
-
     function showError(tabId, msg) {
-        document.getElementById(tabId).innerHTML = '<div class="error-box">⚠️ ' + msg + '</div>';
+        document.getElementById(tabId).innerHTML =
+            '<div class="error-box">⚠️ ' + msg + '</div>';
     }
 
+    // ── Renderers ──────────────────────────────────────────────────────────
     function renderHome(data) {
         const ch = data.children || [];
-        if (!ch.length) { document.getElementById('tab-home').innerHTML = '<div class="spinner-wrap">Farzandlar topilmadi</div>'; return; }
-        
-        let totalCompleted = ch.reduce((a,c)=>a+(c.completed_courses||[]).length,0);
-        let totalPoints = ch.reduce((a,c)=>a+(c.points||0),0);
+        if (!ch.length) {
+            document.getElementById('tab-home').innerHTML =
+                '<div class="spinner-wrap">Farzandlar topilmadi</div>';
+            return;
+        }
+
+        const totalPoints = ch.reduce((a, c) => a + (c.points || 0), 0);
+        const totalCompleted = ch.reduce((a, c) => a + (c.completed_courses || []).length, 0);
 
         let h = '<div class="stat-grid">' +
             '<div class="stat-box"><div class="number">' + ch.length + '</div><div class="stat-label">Farzandlar</div></div>' +
             '<div class="stat-box"><div class="number">' + totalPoints + '</div><div class="stat-label">Umumiy ball</div></div>' +
             '</div>';
-            
+
         ch.forEach(c => {
-            h += '<div class="card"><h3>👦 ' + c.name + '</h3>' +
-                 '<div class="card-row"><span class="label">Platform Daraja:</span><span class="value">' + (c.level || 'Beginner') + '</span></div>' +
-                 '<div class="card-row"><span class="label">Gennis Guruh:</span><span class="value">' + (c.gennis_group || 'Yuklanmoqda...') + '</span></div>' +
-                 '<div class="card-row"><span class="label">Sertifikatlar:</span><span class="badge green">' + (c.completed_courses||[]).length + ' ta</span></div>' +
-                 '</div>';
+            h += '<div class="card"><h3>👦 ' + esc(c.name) + '</h3>' +
+                '<div class="card-row"><span class="label">Platform daraja:</span><span class="value">' + esc(c.level || 'Beginner') + '</span></div>' +
+                '<div class="card-row"><span class="label">Gennis guruh:</span><span class="value">' + esc(c.gennis_group || '—') + '</span></div>' +
+                '<div class="card-row"><span class="label">Streak:</span><span class="value">🔥 ' + (c.streak || 0) + ' kun</span></div>' +
+                '<div class="card-row"><span class="label">Sertifikatlar:</span><span class="badge green">' + (c.completed_courses || []).length + ' ta</span></div>' +
+                '</div>';
         });
+
         document.getElementById('tab-home').innerHTML = h;
         document.getElementById('headerSub').textContent = 'Farzandlar monitoringi';
     }
 
     function renderProgress(data) {
         const ch = data.children || [];
-        if (!ch.length) { document.getElementById('tab-progress').innerHTML = '<div class="spinner-wrap">Ma\'lumot topilmadi</div>'; return; }
-        
+        if (!ch.length) {
+            document.getElementById('tab-progress').innerHTML =
+                '<div class="spinner-wrap">Ma\'lumot topilmadi</div>';
+            return;
+        }
+
         let h = '';
         ch.forEach(c => {
-            h += '<div class="card"><h3>⭐ ' + c.name + '</h3>' +
-                 '<div class="card-row"><strong>Joriy ball:</strong><span class="value" style="font-size:18px; color:#3b82f6;">' + (c.points || 0) + '</span></div>' +
-                 '<div class="card-row"><strong>Daraja:</strong><span class="badge blue">' + (c.level || 'Beginner') + '</span></div>';
-            
-            h += '<div style="margin-top:12px; font-size:13px; color:#666;">Joriy kurslar:</div>';
+            h += '<div class="card"><h3>⭐ ' + esc(c.name) + '</h3>' +
+                '<div class="card-row"><span class="label">Ball:</span><span class="value" style="font-size:18px;color:#3b82f6;">' + (c.points || 0) + '</span></div>' +
+                '<div class="card-row"><span class="label">Daraja:</span><span class="badge blue">' + esc(c.level || 'Beginner') + '</span></div>';
+
             const active = c.active_courses || [];
-            if (active.length > 0) {
+            h += '<div style="margin-top:12px;font-size:13px;color:#666;font-weight:600;">Joriy kurslar:</div>';
+            if (active.length) {
                 active.forEach(k => {
-                    h += '<div class="card-row" style="background:#f8fafc; padding:8px; border-radius:8px; margin-top:4px;">' +
-                         '<span>📘 ' + k.title + '</span></div>';
+                    h += '<div class="card-row" style="background:#f8fafc;padding:8px;border-radius:8px;margin-top:4px;">' +
+                        '<span>📘 ' + esc(k.title) + '</span></div>';
                 });
             } else {
-                h += '<div class="card-row"><span>Kurslar topilmadi</span></div>';
+                h += '<div class="card-row"><span style="color:#94a3b8;">Faol kurslar yo\'q</span></div>';
             }
             h += '</div>';
         });
+
         document.getElementById('tab-progress').innerHTML = h;
     }
 
-    let globalAttendance = {}; 
+    function renderPayments(data) {
+        const ch = data.children || [];
+        if (!ch.length) {
+            document.getElementById('tab-payments').innerHTML =
+                '<div class="spinner-wrap">Ma\'lumot topilmadi</div>';
+            return;
+        }
 
-    function renderPayments(payData) {
-        const ch = payData.children || [];
-        if (!ch.length) { document.getElementById('tab-payments').innerHTML = '<div class="spinner-wrap">Ma\'lumot topilmadi</div>'; return; }
-        
         let h = '';
         ch.forEach(c => {
             const balance = c.balance || 0;
-            const lessonPrice = 430000 / 12;
-            const lessonsLeft = Math.floor(balance / lessonPrice);
             const statusColor = balance < 0 ? '#ef4444' : '#10b981';
 
-            h += '<div class="card"><h3>💰 ' + c.name + '</h3>';
-            h += '<div class="stat-grid" style="grid-template-columns: 1fr 1fr; margin-bottom:15px;">' +
-                 '<div class="stat-box" style="padding:10px;"><div class="number" style="color:'+statusColor+'; font-size:18px;">' + balance.toLocaleString() + '</div><div class="stat-label">Balans (so\'m)</div></div>' +
-                 '<div class="stat-box" style="padding:10px;"><div class="number" style="font-size:18px;">' + (lessonsLeft > 0 ? lessonsLeft : 0) + '</div><div class="stat-label">Dars qoldi</div></div>' +
-                 '</div>';
+            h += '<div class="card"><h3>💰 ' + esc(c.name) + '</h3>';
+            h += '<div class="card-row">' +
+                '<span class="label">Balans:</span>' +
+                '<span class="value" style="color:' + statusColor + ';">' + balance.toLocaleString() + ' so\'m</span>' +
+                '</div>';
 
-            // Attendance Table
-            h += '<div style="margin-top:15px; margin-bottom:8px; font-weight:700; font-size:13px;">📅 Davomat tarixi (Oxirgi darslar)</div>';
-            h += '<div style="overflow-x:auto; background:#f9fafb; border-radius:10px; padding:10px;">' +
-                 '<table style="width:100%; border-collapse:collapse; font-size:12px;">' +
-                 '<thead><tr style="border-bottom:1px solid #eee;">';
-            
-            const att = (globalAttendance.children || []).find(a => a.name === c.name) || {};
-            const dates = (att.attendance ? (att.attendance.dates || Object.keys(att.attendance)) : []).slice(-7).reverse();
-
-            if (dates.length > 0) {
-                dates.forEach(d => { h += '<th style="padding:4px; text-align:center;">' + d.split('-').slice(1).join('/') + '</th>'; });
-                h += '</tr></thead><tbody><tr>';
-                dates.forEach(() => { h += '<td style="padding:8px; text-align:center; color:#10b981;">✅</td>'; });
-                h += '</tr></tbody></table></div>';
-            } else {
-                h += '<div style="font-size:12px; color:#999; padding:10px; text-align:center;">Davomat ma\'lumoti yo\'q</div>';
-            }
-
-            // Payment History
-            h += '<div style="margin-top:15px; margin-bottom:8px; font-weight:700; font-size:13px;">💳 To\'lovlar tarixim</div>';
             const payments = c.payments || [];
-            if (payments.length > 0) {
-                payments.slice(0,5).forEach(p => {
-                    h += '<div class="card-row" style="padding:6px 0; border-bottom:1px solid #f1f5f9;">' +
-                         '<span class="label" style="font-size:12px;">' + (p.date || '—') + '</span>' +
-                         '<span class="value" style="font-size:12px; font-weight:600; color:#10b981;">+' + (p.amount ? p.amount.toLocaleString() : '0') + '</span></div>';
+            h += '<div style="margin-top:12px;font-size:13px;color:#666;font-weight:600;">To\'lovlar tarixi:</div>';
+            if (payments.length) {
+                payments.slice(0, 5).forEach(p => {
+                    h += '<div class="card-row">' +
+                        '<span class="label" style="font-size:12px;">' + esc(p.date || '—') + '</span>' +
+                        '<span class="value" style="font-size:12px;color:#10b981;">+' +
+                        (p.amount ? Number(p.amount).toLocaleString() : '0') + ' so\'m</span>' +
+                        '</div>';
                 });
             } else {
-                h += '<div style="font-size:12px; color:#999; padding:5px 0;">To\'lovlar topilmadi</div>';
+                h += '<div style="font-size:12px;color:#999;padding:8px 0;">To\'lovlar topilmadi</div>';
             }
             h += '</div>';
         });
+
         document.getElementById('tab-payments').innerHTML = h;
     }
 
+    function renderAttendance(data) {
+        // Attendance is shown inside the home tab per-child on demand.
+        // For now we just store it; future tabs can use it.
+        window._attendanceData = data;
+    }
+
+    // Escape HTML to prevent XSS from API data
+    function esc(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // ── Data loading ───────────────────────────────────────────────────────
     async function loadData() {
-        if (!telegramId) {
-            ['home','progress','payments'].forEach(id => showError('tab-'+id, 'ID topilmadi'));
+        if (!parentId) {
+            ['home', 'progress', 'payments'].forEach(id =>
+                showError('tab-' + id, 'Parent ID topilmadi. Botdan qayta oching.')
+            );
             return;
         }
-        
-        const fetchConfig = { headers: { 'ngrok-skip-browser-warning': 'true', 'bypass-tunnel-reminder': 'true' } };
+
+        const headers = { 'Content-Type': 'application/json' };
+        if (tg.initData) {
+            headers['X-Telegram-Init-Data'] = tg.initData;
+        }
 
         try {
-            // First load attendance to be shared
-            const attRes = await fetch(API + '/parent/attendance/' + telegramId, fetchConfig);
-            if (attRes.ok) globalAttendance = await attRes.json();
+            const [progRes, payRes, attRes] = await Promise.all([
+                fetch(`${API}/parent/progress/${parentId}`, { headers }),
+                fetch(`${API}/parent/payments/${parentId}`, { headers }),
+                fetch(`${API}/parent/attendance/${parentId}`, { headers }),
+            ]);
 
-            // Load Progress
-            const progRes = await fetch(API + '/parent/progress/' + telegramId, fetchConfig);
-            if (progRes.ok) {
-                const data = await progRes.json();
-                renderHome(data);
-                renderProgress(data);
-            } else throw new Error('Progress load failed');
+            if (!progRes.ok) throw new Error(`Progress: ${progRes.status}`);
+            if (!payRes.ok) throw new Error(`Payments: ${payRes.status}`);
 
-            // Load Payments
-            const payRes = await fetch(API + '/parent/payments/' + telegramId, fetchConfig);
-            if (payRes.ok) {
-                renderPayments(await payRes.json());
-            } else throw new Error('Payments load failed');
+            const progData = await progRes.json();
+            const payData = await payRes.json();
 
-        } catch(e) { 
+            renderHome(progData);
+            renderProgress(progData);
+            renderPayments(payData);
+
+            if (attRes.ok) {
+                renderAttendance(await attRes.json());
+            }
+
+        } catch (e) {
             console.error(e);
-            ['tab-home','tab-progress','tab-payments'].forEach(id => showError(id, 'Ma\'lumot yuklashda xatolik'));
+            ['tab-home', 'tab-progress', 'tab-payments'].forEach(id =>
+                showError(id, 'Ma\'lumot yuklashda xatolik: ' + e.message)
+            );
         }
     }
 
