@@ -19,6 +19,9 @@ student_basic_reply_keyboard = ReplyKeyboardMarkup(
 
         ],
         [
+            KeyboardButton(text="🖥️ Platform statistikasi"),
+        ],
+        [
             KeyboardButton(text="🚪 Chiqish"),
         ]
     ],
@@ -58,6 +61,17 @@ student_basic_reply_keyboard_test_type = ReplyKeyboardMarkup(
     resize_keyboard=True,
     input_field_placeholder="👆 Birini tanlang!"
 )
+
+
+def create_platform_courses_keyboard(courses):
+    builder = InlineKeyboardBuilder()
+    for c in courses:
+        done = c.get("lessons_completed", 0)
+        total = c.get("lessons_total", 0)
+        label = f"📘 {c['title']} ({done}/{total})"
+        builder.button(text=label, callback_data=f"pstat_course_{c['id']}")
+    builder.adjust(1)
+    return builder.as_markup()
 
 
 def create_months_inline_keyboard(data, selected_year=None):

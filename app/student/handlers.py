@@ -17,6 +17,7 @@ from app.states import MenuStates, TestStates
 from .keyboards import (
     create_years_reply_keyboard,
     create_months_inline_keyboard,
+    create_platform_courses_keyboard,
     student_basic_reply_keyboard,
     student_basic_reply_keyboard_test_type,
 )
@@ -677,3 +678,93 @@ async def handle_month_selection(callback: types.CallbackQuery, state: FSMContex
         data["dates_info"], data["selected_year"]
     )
     await callback.message.answer("✅ Yana oy tanlang:", reply_markup=months_keyboard)
+
+
+TECH_API = "https://tech.gennis.uz/api/v1/bot"
+
+
+@student_router.message(StateFilter("*"), F.text == "🖥️ Platform statistikasi")
+async def show_platform_stats(message: Message, state: FSMContext):
+    await state.clear()
+    student = get_student(message.from_user.id)
+    if not student:
+        await message.answer("❌ O'quvchi topilmadi.")
+        return
+
+    try:
+        resp = requests.get(f"{TECH_API}/student-stats/{student.platform_id}", timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+    except Exception as e:
+        logger.error(f"Platform stats error: {e}")
+        await message.answer("⚠️ Platform ma'lumotlarini olishda xatolik yuz berdi.")
+        return
+
+    name = data.get("name") or "O'quvchi"
+    total_pts = data.get("total_points", 0)
+    global_rank = data.get("global_rank", 0)
+    weekly_pts = data.get("weekly_points", 0)
+    courses = data.get("courses", [])
+
+    text = (
+        f"🖥️ <b>Platform statistikasi</b>\n"
+        f"👤 <b>{name}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"🏆 Umumiy ball: <b>{total_pts}</b>\n"
+        f"📅 Haftalik ball: <b>{weekly_pts}</b>\n"
+        f"🥇 Global reyting: <b>#{global_rank}</b>\n"
+        f"📚 Kurslar soni: <b>{len(courses)}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"Batafsil ko'rish uchun kurs tanlang 👇"
+    )
+
+    await state.update_data(platform_courses=courses)
+    if courses:
+        await message.answer(text, parse_mode="HTML",
+                             reply_markup=create_platform_courses_keyboard(courses))
+    else:
+        await message.answer(text + "\n\n⚠️ Hech qanday kursga yozilmagansiz.", parse_mode="HTML")
+
+
+@student_router.callback_query(F.data.startswith("pstat_course_"))
+async def show_course_stats(callback: types.CallbackQuery, state: FSMContext):
+    course_id = int(callback.data.split("_")[-1])
+    data = await state.get_data()
+    courses = data.get("platform_courses", [])
+    course = next((c for c in courses if c["id"] == course_id), None)
+
+    if not course:
+        await callback.answer("Ma'lumot topilmadi.", show_alert=True)
+        return
+
+    done = course.get("lessons_completed", 0)
+    total = course.get("lessons_total", 0)
+    percent = round(done / total * 100) if total else 0
+
+    ex = course.get("exercises", {})
+    ex_total = ex.get("total", 0)
+    ex_correct = ex.get("correct", 0)
+    ex_pct = round(ex_correct / ex_total * 100) if ex_total else 0
+
+    projects = course.get("projects", [])
+
+    text = (
+        f"📘 <b>{course['title']}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"📖 Darslar: <b>{done}/{total}</b> ({percent}%)\n"
+        f"✏️ Mashqlar: <b>{ex_correct}/{ex_total}</b> to'g'ri ({ex_pct}%)\n"
+    )
+
+    if projects:
+        text += f"\n🗂️ <b>Loyihalar ({len(projects)}):</b>\n"
+        status_emoji = {"Submitted": "⏳", "Approved": "✅", "Rejected": "❌", "Pending": "🔄"}
+        for p in projects:
+            emoji = status_emoji.get(p.get("status", ""), "📌")
+            grade = f" | Baho: {p['grade']}" if p.get("grade") else ""
+            pts = f" | +{p['points']} ball" if p.get("points") else ""
+            text += f"  {emoji} {p['lesson']}{grade}{pts}\n"
+    else:
+        text += "\n📭 Loyiha topshiriqlar hali bajarilmagan."
+
+    await callback.message.answer(text, parse_mode="HTML")
+    await callback.answer()
