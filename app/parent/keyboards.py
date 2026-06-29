@@ -82,9 +82,15 @@ def generate_student_keyboard_for_parent(parent: Parent, telegram_id: int) -> Re
             buttons.append(temp_row)
 
     miniapp_base = os.getenv('MINIAPP_URL', 'https://quarry-cabbie-galley.ngrok-free.dev/parent-miniapp.html')
+    children_ids = ','.join(
+        str(s.platform_id) for s in parent.students if s.platform_id
+    )
+    miniapp_url = f"{miniapp_base}?parent_id={parent.platform_id}"
+    if children_ids:
+        miniapp_url += f"&children={children_ids}"
     buttons.append([KeyboardButton(
         text="📊 Ota-ona kabineti (MiniApp)",
-        web_app={"url": f"{miniapp_base}?parent_id={parent.platform_id}"}
+        web_app={"url": miniapp_url}
     )])
     buttons.append([KeyboardButton(text="🚪 Chiqish")])
 
